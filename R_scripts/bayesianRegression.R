@@ -3,6 +3,59 @@
 # Author: Christoph
 ###############################################################################
 
+BBSR <- function(X, Y, Pi, clr.mat, nS, no.pr.val, weights.mat, cores) {
+
+  if (!all(apply(Pi, 1, identical, Pi[1,]))) {
+    stop('BBSR not implemented for biclusters. Use CallBestSubSetRegression instead')
+  }
+  
+  perm <- Pi[1, ]
+  
+  # Scale and permute design and response matrix
+  X <- t(scale(t(X[, perm])))
+  Y <- t(scale(t(Y[, perm])))
+  
+  G <- nrow(Y)  # number of genes
+  K <- nrow(X)  # max number of possible predictors (number of TFs)
+  
+  pp <- matrix(FALSE, G, K)  # predictors that will be used in the regression
+  
+  # keep all predictors that we have priors for
+  pp[weights.mat != no.pr.val] <- TRUE
+  
+  # for each gene, add the top nS predictors of the list to possible predictors
+  for (ind in 1:G) {
+    clr.order <- order(clr.mat[ind, ], decreasing=TRUE)
+    pp[ind, clr.order[1:min(K, nS)]] <- TRUE
+  }
+  
+  out.list <- mclapply(1:G, BBSRforOneGene, X, Y, pp, weights.mat, nS, mc.cores=cores)
+  
+  return(out.list)
+}
+
+BBSRforOneGene <- function(ind, X, Y, pp, weights.mat, nS) {
+  if (ind %% 100 == 0) {
+    cat('Progress: BBSR for gene', ind, '\n')
+  }
+  
+  pp.i <- pp[ind, ]
+  # create BestSubsetRegression input  
+  y <- as.vector(Y[ind, ], mode="numeric")
+  x <- t(as.matrix(X[pp.i, ]))
+  g <- weights.mat[ind, pp.i]
+  
+  # experimental stuff
+  spp <- ReduceNumberOfPredictors(y, x, g, nS)
+  pp.i[pp.i == TRUE] <- spp
+  x <- t(as.matrix(X[pp.i, ]))
+  g <- weights.mat[ind, pp.i]
+  
+  betas <- BestSubsetRegression(y, x, g)
+  betas.resc <- PredErrRed(y, x, betas)
+  return(list(ind=ind, pp=pp.i, betas=betas, betas.resc=betas.resc))
+}
+
 CallBestSubSetRegression <- function(ind, Xs, Y, Pi, clr.mat, nS,
                                      no.pr.val = NULL,
                                      weights.mat = NULL) {
@@ -10,7 +63,7 @@ CallBestSubSetRegression <- function(ind, Xs, Y, Pi, clr.mat, nS,
   # TODO: Add more here
   
   cat("*")
-
+  browser()
   # Scale and permute design and response matrix
   Xs.scaled <- t(scale(t(Xs[, Pi[ind, ]])))
   Y.scaled <- t(scale(t(Y[, Pi[ind, ]])))
@@ -79,93 +132,8 @@ CallBestSubSetRegression <- function(ind, Xs, Y, Pi, clr.mat, nS,
   # cut the crap and end this here
   return(list(ind=ind, pp=pp, betas=betas.x, betas.resc=betas.resc))
   
-  # Take betas.full and betas.resc.full and create correct output
-  beta.mat <- matrix(0, ncol=6, nrow=0)
-  colnames(beta.mat) <- c("trgt", "tf", "beta", "prd_xpln_var", "min.l2", "bias")
-  for (i in 1:length(betas.resc.full)) {
-    if (betas.full[i] != 0) { 
-      beta.mat <- rbind(beta.mat, c(ind, i, betas.full[i], betas.resc.full[i],
-                                    -Inf, -Inf))
-    }
-  }
-  
-  #print(data.frame(weights.mat[ind, ]
-
-  mat.obj <- list(ind, beta.mat, -Inf)
-  names(mat.obj) <- c("ind", "bM", "allLambdaRes")
-
-  #-----------------------#
-  #AG change 9/16
-  #MEN was changed to return only a priors object
-  #the same is done here, to be consistent
-  #-----------------------#
-  # create output object
-  obj <- list()
-  obj[["priors"]]  <- mat.obj
-  return(obj)
 }
 
-bbsrHelper <- function(ind, Xs.scaled, Y.scaled, pp, weights.mat) {
-  # create BestSubsetRegression input  
-  y <- as.vector(Y.scaled[ind, ], mode="numeric")
-  x <- t(as.matrix(Xs.scaled[pp[ind,], ]))
-  g <- weights.mat[ind, pp[ind,]]
-  
-  # run the best subset regression
-  betas.x <- BestSubsetRegression(y, x, g)
-  betas.resc.full <- rep(0, nrow(Xs.scaled))
-  betas.resc.full[pp[ind,]] <- PredErrRed(y, x, betas.x)
-  return(betas.resc.full)
-}
-
-bbsr <- function(Xs, Y, clr.mat, weights.mat, no.pr.val, nS, cores) {
-  # Scale design and response matrix
-  Xs.scaled <- t(scale(t(Xs)))
-  Y.scaled <- t(scale(t(Y)))
-  
-  G <- nrow(Y.scaled)  # number of genes
-  K <- nrow(Xs.scaled)  # max number of possible predictors (number of TFs)
-  
-  pp <- matrix(FALSE, G, K)  # predictors that will be used in the regression
-  
-  # bump predictors with priors to top of list
-  #clr.mat[weights.mat != no.pr.val] <- Inf
-  clr.mat[weights.mat != no.pr.val] <- clr.mat[weights.mat != no.pr.val] + max(clr.mat) + .Machine$double.eps
-  
-  # send self predictor to end of list
-  diag(clr.mat) <- -Inf
-  
-  # for each gene, add the top nS predictors of the list to possible predictors
-  for (ind in 1:G) {
-    clr.order <- order(clr.mat[ind, ], decreasing=TRUE)
-    pp[ind, clr.order[1:min(K, nS)]] <- TRUE
-  }
-  
-  beta.list <- mclapply(as.list(1:G), bbsrHelper, Xs.scaled, Y.scaled, pp, weights.mat, mc.cores = cores)
-  #beta.list <- lapply(as.list(1:G), bbsrHelper, Xs.scaled, Y.scaled, pp, weights.mat)
-  return(matrix(unlist(beta.list), length(beta.list), byrow=T))
-}
-
-# bootstrapped version, returns list of betas
-bbsrBS <- function(Xs, Y, clr.mat, weights.mat, no.pr.val, nS, cores, nbs, seed=NULL) {
-  list.of.betas <- list()
-  if (nbs == 0) {
-    beta <- bbsr(Xs, Y, clr.mat, weights.mat, no.pr.val, nS, cores)
-    list.of.betas[[1]] <- beta
-  }
-  else {
-    if (is.null(seed) == FALSE) {
-      set.seed(seed, "Mersenne-Twister", "Inversion") 
-    }
-    N <- ncol(Y)  # number of conditions
-    for (i in 1:nbs) {
-      idxs <- sample(1:N, replace=T)
-      beta <- bbsr(Xs[, idxs], Y[, idxs], clr.mat, weights.mat, no.pr.val, nS, cores)
-      list.of.betas[[i]] <- beta
-    }
-  }
-  return(list.of.betas)
-}
 
 ReduceNumberOfPredictors <- function(y, x, g, n) {
   K <- ncol(x)
@@ -175,7 +143,7 @@ ReduceNumberOfPredictors <- function(y, x, g, n) {
   }
 
   combos <- cbind(diag(K) == 1, CombCols(diag(K)))
-  bics <- ExpBICforAllCombosNew(y, x, g, combos)
+  bics <- ExpBICforAllCombos(y, x, g, combos)
   bics.avg <- apply(t(t(combos) * bics), 1, sum)
   ret <- rep(FALSE, K)
   ret[order(bics.avg)[1:n]] <- TRUE
@@ -226,19 +194,35 @@ BestSubsetRegression <- function(y, x, g) {
   ret <- c()
 
   combos <- AllCombinations(K)
-  #bics <- StatsForAllCombos(y, x, g, combos)
-  bics <- ExpBICforAllCombosNew(y, x, g, combos)
-  #bics <- BICforAllCombos(y, x, g, combos)
-  best <- which.min(bics)
+  bics <- ExpBICforAllCombos(y, x, g, combos)
   
+  not.done <- TRUE
+  while (not.done) {
+    best <- which.min(bics)
+    #cat('best is', best, '\n')
   
-  # For the return value, re-compute beta ignoring g-prior.
-  betas <- rep(0, K)
-  if (best > 1) {
-    x.tmp <- matrix(x[,combos[, best]], N)
-    #bhat <- solve(t(x.tmp) %*% x.tmp) %*% t(x.tmp) %*% y
-    bhat <- solve(crossprod(x.tmp), crossprod(x.tmp, y))
-    betas[combos[, best]] <- bhat
+    # For the return value, re-compute beta ignoring g-prior.
+    betas <- rep(0, K)
+    if (best > 1) {
+      x.tmp <- matrix(x[,combos[, best]], N)
+      
+      tryCatch({
+        bhat <- solve(crossprod(x.tmp), crossprod(x.tmp, y))
+        betas[combos[, best]] <- bhat
+        not.done <- FALSE
+      }, error = function(e) {
+        if (any(grepl('solve.default', e$call)) & grepl('singular', e$message)) {
+          # error in solve - system is computationally singular
+          cat(bics[best], 'at', best, 'replaced\n')
+          bics[best] <<- Inf
+        } else {
+          stop(e)
+        }
+      })
+    }
+    else {
+      not.done <- FALSE
+    }
   }
   return(betas)
 }
@@ -287,109 +271,7 @@ CombCols <- function(m) {
 }
 
 
-BICforAllCombos <- function(y, x, g, combos) {
-  # Deprecated!
-  # For a list of combinations of predictors do Bayesian linear regression,
-  # more specifically use the mean beta of Zellner's g-prior method. The
-  # variance of the residuals is used to compute the BIC.
-  # Returns list of BIC values, one for each model.
-  
-  warning("Deprecated", call.=TRUE)
-  K <- ncol(x)
-  N <- nrow(x)
-  
-  C <- ncol(combos)
-  bics <- rep(0, C)
-  
-  # assume first combination is the null model
-  # TODO remove this assumption
-  bics[1] <- N * log(var(y))
-  
-  for (i in 2:C) {
-    x.tmp <- matrix(x[,combos[, i]], N)
-    residuals <- y - x.tmp %*% ZellnerBetaM(y, x.tmp, g[combos[, i]])
-    sigma.squared <- var(residuals)
-    bics[i] <- N * log(sigma.squared) + ncol(x.tmp) * log(N)
-  }
-  
-  return(bics)
-}
-
-
 ExpBICforAllCombos <- function(y, x, g, combos) {
-  # For a list of combinations of predictors do Bayesian linear regression,
-  # more specifically calculate the parametrization of the inverse gamma 
-  # distribution that underlies sigma squared using Zellner's g-prior method.
-  # Parameter g can be a vector. The expected value of the log of sigma squared
-  # is used to compute expected values of BIC.
-  # Returns list of expected BIC values, one for each model.
-  K <- ncol(x)
-  N <- nrow(x)
-  
-  C <- ncol(combos)
-  bics <- rep(0, C)
-    
-  bics[1] <- N * log(var(y))
-  
-  # shape parameter for the inverse gamma sigma squared would be drawn from  
-  shape <- N / 2
-  
-  # compute digamma of shape here, so we can re-use it later
-  dig.shape <- digamma(shape)
-    
-  for (i in 2:C){
-    x.tmp <- matrix(x[,combos[, i]], N)
-    k <- ncol(x.tmp)
-
-    g.tmp <- g[combos[, i]]
-    
-    # our guess on the regression vector beta is all 0 for sparse models
-    beta0 <- rep(0, k)
-    
-    # don't call lm, it's slow
-    #lm.out <- lm(y ~ 0 + x.tmp)
-    #lm.out <- lm.fit(x.tmp, y)
-    #bhat <- matrix(lm.out$coefficients, 1)
-    #ssr <- sum(lm.out$residuals ^ 2)
-    
-    # this is faster than calling lm
-    #bhat <- t(solve(t(x.tmp) %*% x.tmp) %*% t(x.tmp) %*% y)
-    #ssr <- sum((y - x.tmp %*% t(bhat))^2)  # sum of squares of residuals
-    #bhat <- solve(t(x.tmp) %*% x.tmp) %*% t(x.tmp) %*% y
-    bhat <- solve(crossprod(x.tmp), crossprod(x.tmp, y))
-    ssr <- sum((y - x.tmp %*% bhat)^2)  # sum of squares of residuals
-    
-    # In Zellner's formulation there is a factor in the calculation of the rate 
-    # parameter: 1 / (g + 1)
-    # Here we replace the factor with the approriate matrix since g is a vector
-    # now.
-    var.mult <- matrix(sqrt(1 / (g.tmp + 1)), k, k)
-    var.mult <- var.mult * t(var.mult)
-    
-    # rate parameter for the inverse gamma sigma squared would be drawn from
-    #rate <- (ssr + 
-    #        (beta0 - t(bhat)) %*% 
-    #        (t(x.tmp) %*% x.tmp * var.mult) %*% 
-    #        t(beta0 - t(bhat))) / 2
-            
-    rate <- (ssr + 
-            (beta0 - t(bhat)) %*% 
-            (crossprod(x.tmp) * var.mult) %*% 
-            t(beta0 - t(bhat))) / 2
-    
-    # the expected value of the log of sigma squared based on the 
-    # parametrization of the inverse gamma by rate and shape
-    exp.log.sigma2 <- log(rate) - dig.shape
-    
-    # expected value of BIC
-    bics[i] <- N * exp.log.sigma2 + k * log(N)
-  }
-  
-  return(bics)
-}
-
-
-ExpBICforAllCombosNew <- function(y, x, g, combos) {
   # For a list of combinations of predictors do Bayesian linear regression,
   # more specifically calculate the parametrization of the inverse gamma 
   # distribution that underlies sigma squared using Zellner's g-prior method.
@@ -431,37 +313,40 @@ ExpBICforAllCombosNew <- function(y, x, g, combos) {
     x.tmp <- matrix(x[, comb], N)
     k <- sum(comb)
     
-    # this is faster than calling lm
-    bhat <- solve(xtx[comb, comb], xty[comb])
-    ssr <- sum((y - x.tmp %*% bhat)^2)  # sum of squares of residuals
+    tryCatch({
+      # this is faster than calling lm
+      bhat <- solve(xtx[comb, comb], xty[comb])
+      
+      ssr <- sum((y - x.tmp %*% bhat)^2)  # sum of squares of residuals
     
-    # rate parameter for the inverse gamma sigma squared would be drawn from
-    # our guess on the regression vector beta is all 0 for sparse models
-    rate <- (ssr + 
-            (0 - t(bhat)) %*% 
-            (xtx[comb, comb] * var.mult[comb, comb]) %*% 
-            t(0 - t(bhat))) / 2
+        # rate parameter for the inverse gamma sigma squared would be drawn from
+        # our guess on the regression vector beta is all 0 for sparse models
+        rate <- (ssr + 
+                (0 - t(bhat)) %*% 
+                (xtx[comb, comb] * var.mult[comb, comb]) %*% 
+                t(0 - t(bhat))) / 2
+        
+        # the expected value of the log of sigma squared based on the 
+        # parametrization of the inverse gamma by rate and shape
+        exp.log.sigma2 <- log(rate) - dig.shape
+        
+        # expected value of BIC
+        bics[i] <- N * exp.log.sigma2 + k * log(N)
+      
+    }, error = function(e) {
+      if (any(grepl('solve.default', e$call)) & grepl('singular', e$message)) {
+        # error in solve - system is computationally singular
+        bics[i] <<- Inf
+      } else {
+        stop(e)
+      }
+    })
     
-    # the expected value of the log of sigma squared based on the 
-    # parametrization of the inverse gamma by rate and shape
-    exp.log.sigma2 <- log(rate) - dig.shape
-    
-    # expected value of BIC
-    bics[i] <- N * exp.log.sigma2 + k * log(N)
   }
   
   return(bics)
 }
 
-
-ZellnerBetaM <- function(y, x, g, beta0=0) {
-  # Compute the mean of the betas using Zellner's g-prior.
-  bhat <- solve(t(x) %*% x) %*% t(x) %*% y
-  #beta.m <- g / (g + 1) * (beta0 / g + bhat)
-  # this version of beta.m also works if g is Inf
-  beta.m <- (1 - 1 / (g + 1)) * (beta0 / g + bhat)
-  return(beta.m)
-}
 
 
 PredErrRed <- function(y, x, beta) {

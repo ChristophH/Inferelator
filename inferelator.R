@@ -28,9 +28,9 @@ PARS$input.dir <- 'input/dream4'
 
 PARS$exp.mat.file <- 'expression.tsv'
 PARS$tf.names.file <- 'tf_names.tsv'
-PARS$meta.data.file <- 'meta_data.tsv'
-PARS$priors.file <- 'gold_standard.tsv'
-PARS$gold.standard.file <- 'gold_standard.tsv'
+PARS$meta.data.file <- NULL
+PARS$priors.file <- NULL
+PARS$gold.standard.file <- NULL
 
 PARS$job.seed <- 42  # set to NULL if a random seed should be used
 PARS$save.to.dir <- file.path(PARS$input.dir, date.time.str)
@@ -69,7 +69,8 @@ args <- commandArgs(trailingOnly = TRUE)
 if (length(args) == 1) {
   job.cfg <- args[1]
 } else {
-  job.cfg <- 'jobs/dream4_cfg.R'
+  job.cfg <- '/home/ch1421/Projects/Rice/Public_Data/inferelator_jobs/nipponbare.R'
+  #job.cfg <- 'jobs/bsubtilis_cfg.R'
 }
 
 # load job specific parameters from input config file
@@ -79,31 +80,11 @@ if (!is.null(job.cfg)) {
 
 
 # read input data
-
-IN <- list()
-IN$exp.mat <- as.matrix(read.table(file=file.path(PARS$input.dir, PARS$exp.mat.file),
-                                   row.names=1, header=T, sep='\t', check.names=F))
-IN$tf.names <- as.vector(as.matrix(read.table(file.path(PARS$input.dir, PARS$tf.names.file))))
-
-IN$meta.data <- NULL
-if (!is.null(PARS$meta.data.file)) {
-  IN$meta.data <- read.table(file=file.path(PARS$input.dir, PARS$meta.data.file), 
-                             header=T, sep='\t')
-}
-
-IN$priors.mat <- NULL
-if (!is.null(PARS$priors.file)) {
-  IN$priors.mat <- as.matrix(read.table(file=file.path(PARS$input.dir, PARS$priors.file),
-                                  row.names=1, header=T, sep='\t', check.names=F))
-}
-IN$gs.mat <- NULL
-if (!is.null(PARS$gold.standard.file)) {
-  IN$gs.mat <- as.matrix(read.table(file=file.path(PARS$input.dir, PARS$gold.standard.file),
-                                  row.names=1, header=T, sep='\t', check.names=F))
-}
-
-
-
+IN <- read.input(PARS$input.dir, PARS$exp.mat.file, PARS$tf.names.file, 
+                 PARS$meta.data.file, PARS$priors.file, PARS$gold.standard.file)
+                       
+# keep only TFs that are part of the expression data
+IN$tf.names <- IN$tf.names[IN$tf.names %in% rownames(IN$exp.mat)]
 
 # order genes so that TFs come before the other genes
 gene.order <- rownames(IN$exp.mat)
@@ -177,6 +158,14 @@ IN$final_response_matrix <- x[[1]]
 IN$final_design_matrix <- x[[2]]
 resp.idx <- x[[3]]
 
+X <- IN$final_design_matrix
+Y <- IN$final_response_matrix
+
+if (nrow(X) > 6000) {
+  X <- X[IN$tf.names, ]  # speeds up MI calculation for large datasets
+}
+    
+
 ##  .-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.
 # set up the bootstrap permutations
 ##  .-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.
@@ -239,21 +228,17 @@ for (prior.name in names(priors)) {
     diag(Ms_bg) <- 0
     
     # get CLR matrix
+    cat("Calculating CLR Matrix\n")
     clr.mat = mixedCLR(Ms_bg,Ms)
     colnames(clr.mat) <- rownames(IN$final_design_matrix)
     rownames(clr.mat) <- rownames(IN$final_response_matrix)
     clr.mat <- clr.mat[, IN$tf.names]
     
     # get the sparse ODE models
-    X <- IN$final_design_matrix[IN$tf.names, ]
-    Y <- IN$final_response_matrix
-    
     cat('Calculating sparse ODE models\n')
     if (PARS$method == 'BBSR') {
-      x <- mclapply(1:nrow(Y), CallBestSubSetRegression, Xs=X, Y=Y, 
-                    Pi=IN$bs.pi[[bootstrap]], clr.mat=clr.mat, 
-                    nS=PARS$max.preds, no.pr.val=no.pr.weight, 
-                    weights.mat=weights.mat, mc.cores=PARS$cores)
+      x <- BBSR(X, Y, IN$bs.pi[[bootstrap]], clr.mat, PARS$max.preds, 
+                no.pr.weight, weights.mat, PARS$cores)
     }
     if (PARS$method == 'MEN' ) {
       x <- mclapply(1:nrow(Y), callMEN, Xs=X, Y=Y, Pi=IN$bs.pi[[bootstrap]], 

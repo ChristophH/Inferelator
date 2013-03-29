@@ -17,6 +17,8 @@ mi <- function(x, y, nbins=10, cpu.n=1, perm.mat=NULL) {
   if(!is.null(perm.mat)) {
     for (i in 1:ncol(x)) {
       x[, i] <- x[perm.mat[, i], i]
+    }
+    for (i in 1:ncol(y)) {
       y[, i] <- y[perm.mat[, i], i]
     }
   }

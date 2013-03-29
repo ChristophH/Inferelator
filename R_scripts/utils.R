@@ -23,3 +23,34 @@ trivial.meta.data <- function(cond.names) {
   meta.data$del.t <- NA
   return(meta.data)
 }
+
+read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file, 
+                       priors.file, gold.standard.file) {
+  IN <- list()
+  
+  if (grepl('.RData$', exp.mat.file)) {
+    IN$exp.mat <- local(get(load(file.path(input.dir, exp.mat.file))))
+  } else {
+    IN$exp.mat <- as.matrix(read.table(file=file.path(input.dir, exp.mat.file),
+                            row.names=1, header=T, sep='\t', check.names=F))
+  }
+  IN$tf.names <- as.vector(as.matrix(read.table(file.path(input.dir, tf.names.file))))
+
+  IN$meta.data <- NULL
+  if (!is.null(meta.data.file)) {
+    IN$meta.data <- read.table(file=file.path(input.dir, meta.data.file), 
+                               header=T, sep='\t')
+  }
+
+  IN$priors.mat <- NULL
+  if (!is.null(priors.file)) {
+    IN$priors.mat <- as.matrix(read.table(file=file.path(input.dir, priors.file),
+                                    row.names=1, header=T, sep='\t', check.names=F))
+  }
+  IN$gs.mat <- NULL
+  if (!is.null(gold.standard.file)) {
+    IN$gs.mat <- as.matrix(read.table(file=file.path(input.dir, gold.standard.file),
+                                    row.names=1, header=T, sep='\t', check.names=F))
+  }
+  return(IN)
+}

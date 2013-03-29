@@ -1,5 +1,6 @@
 PARS$input.dir <- 'input/bsubtilis'
 
+PARS$meta.data.file <- 'meta.data.tsv'
 PARS$priors.file <- 'gold_standard.tsv'
 PARS$gold.standard.file <- 'gold_standard.tsv'
 
