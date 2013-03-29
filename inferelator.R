@@ -69,8 +69,7 @@ args <- commandArgs(trailingOnly = TRUE)
 if (length(args) == 1) {
   job.cfg <- args[1]
 } else {
-  job.cfg <- '/home/ch1421/Projects/Rice/Public_Data/inferelator_jobs/nipponbare.R'
-  #job.cfg <- 'jobs/bsubtilis_cfg.R'
+  job.cfg <- NULL
 }
 
 # load job specific parameters from input config file

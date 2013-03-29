@@ -87,3 +87,20 @@ needed for validation; matrix of 0 and 1 indicating whether there is an
 interaction between one TF and a gene; one row for each gene, one column for 
 each TF; must include row (genes) and column (TF) names
 
+
+
+--------------------------------------------------------------------------------
+Output Files
+--------------------------------------------------------------------------------
+
+One or more betas_frac_tp_X_perm_X--frac_fp_X_perm_X_X.RData files. One file
+per true and false prior and prior weight combination. Each RData file contains
+two lists of length PARS$num.boots where every entry is a matrix of betas and
+confidence scores (rescaled betas) respectively.
+
+One or more combinedconf_frac_tp_X_perm_X--frac_fp_X_perm_X_X.RData files with
+one matrix each. The matrix is the rank-combined version of the confidence
+scores of all bootstraps.
+
+A params_and_input.RData file with data objects holding the user set parameters,
+and input and input-derived objects.
