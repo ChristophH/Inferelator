@@ -25,7 +25,7 @@ trivial.meta.data <- function(cond.names) {
 }
 
 read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file, 
-                       priors.file, gold.standard.file) {
+                       priors.file, gold.standard.file, leave.out.file) {
   IN <- list()
   
   if (grepl('.RData$', exp.mat.file)) {
@@ -41,7 +41,18 @@ read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file,
     IN$meta.data <- read.table(file=file.path(input.dir, meta.data.file), 
                                header=T, sep='\t')
   }
-
+  
+  # if there is a leave-out file, ignore some conditions
+  if (!is.null(leave.out.file)) {
+    leave.out <- as.vector(as.matrix(read.table(file.path(input.dir, leave.out.file))))
+    cat('Leaving out the following conditions:', leave.out, '\n')
+    lo <- colnames(IN$exp.mat) %in% leave.out
+    IN$exp.mat.lo <- as.matrix(IN$exp.mat[, lo])
+    IN$meta.data.lo <- IN$meta.data[lo, ]
+    IN$exp.mat <- as.matrix(IN$exp.mat[, !lo])
+    IN$meta.data <- IN$meta.data[!lo, ]
+  }
+  
   IN$priors.mat <- NULL
   if (!is.null(priors.file)) {
     IN$priors.mat <- as.matrix(read.table(file=file.path(input.dir, priors.file),

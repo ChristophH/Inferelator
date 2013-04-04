@@ -31,6 +31,7 @@ PARS$tf.names.file <- 'tf_names.tsv'
 PARS$meta.data.file <- NULL
 PARS$priors.file <- NULL
 PARS$gold.standard.file <- NULL
+PARS$leave.out.file <- NULL
 
 PARS$job.seed <- 42  # set to NULL if a random seed should be used
 PARS$save.to.dir <- file.path(PARS$input.dir, date.time.str)
@@ -80,8 +81,9 @@ if (!is.null(job.cfg)) {
 
 # read input data
 IN <- read.input(PARS$input.dir, PARS$exp.mat.file, PARS$tf.names.file, 
-                 PARS$meta.data.file, PARS$priors.file, PARS$gold.standard.file)
-                       
+                 PARS$meta.data.file, PARS$priors.file, PARS$gold.standard.file,
+                 PARS$leave.out.file)
+
 # keep only TFs that are part of the expression data
 IN$tf.names <- IN$tf.names[IN$tf.names %in% rownames(IN$exp.mat)]
 
@@ -218,22 +220,23 @@ for (prior.name in names(priors)) {
     
     # fill mutual information matrices
     cat("Calculating MI\n")	
-    Ms <- mi(t(IN$final_response_matrix), t(IN$final_design_matrix), 
+    Ms <- mi(t(Y), t(X), 
              nbins=PARS$mi.bins, cpu.n=PARS$cores, perm.mat=t(IN$bs.pi[[bootstrap]]))
     diag(Ms) <- 0
     cat("Calculating Background MI\n")
-    Ms_bg <- mi(t(IN$final_design_matrix), t(IN$final_design_matrix), 
+    Ms_bg <- mi(t(X), t(X), 
                 nbins=PARS$mi.bins, cpu.n=PARS$cores, perm.mat=t(IN$bs.pi[[bootstrap]]))
     diag(Ms_bg) <- 0
     
     # get CLR matrix
     cat("Calculating CLR Matrix\n")
     clr.mat = mixedCLR(Ms_bg,Ms)
-    colnames(clr.mat) <- rownames(IN$final_design_matrix)
-    rownames(clr.mat) <- rownames(IN$final_response_matrix)
+    colnames(clr.mat) <- rownames(X)
+    rownames(clr.mat) <- rownames(Y)
     clr.mat <- clr.mat[, IN$tf.names]
     
     # get the sparse ODE models
+    X <- X[IN$tf.names, ]
     cat('Calculating sparse ODE models\n')
     if (PARS$method == 'BBSR') {
       x <- BBSR(X, Y, IN$bs.pi[[bootstrap]], clr.mat, PARS$max.preds, 
