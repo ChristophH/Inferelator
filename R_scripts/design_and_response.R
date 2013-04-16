@@ -154,7 +154,7 @@ get_usr_chosen_response <- function(cM, r, delT_min, delT_max, method, tau,
       if(any(eq_idx_pseudo)){
         response_matrixSS = rTS[,eq_idx_pseudo,drop=F]
       }else{
-        response_matrixSS = matrix()		
+        response_matrixSS = rSS
       }
     }
     

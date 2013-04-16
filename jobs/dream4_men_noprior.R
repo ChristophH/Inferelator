@@ -1,6 +1,6 @@
 PARS$input.dir <- 'input/dream4'
 
-PARS$meta.data.file <- 'meta.data.tsv'
+PARS$meta.data.file <- 'meta_data.tsv'
 PARS$priors.file <- 'gold_standard.tsv'
 PARS$gold.standard.file <- 'gold_standard.tsv'
 
