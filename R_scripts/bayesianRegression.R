@@ -3,17 +3,11 @@
 # Author: Christoph
 ###############################################################################
 
-BBSR <- function(X, Y, Pi, clr.mat, nS, no.pr.val, weights.mat, cores) {
+BBSR <- function(X, Y, clr.mat, nS, no.pr.val, weights.mat, cores) {
 
-  if (!all(apply(Pi, 1, identical, Pi[1,]))) {
-    stop('BBSR not implemented for biclusters. Use CallBestSubSetRegression instead')
-  }
-  
-  perm <- Pi[1, ]
-  
   # Scale and permute design and response matrix
-  X <- t(scale(t(X[, perm])))
-  Y <- t(scale(t(Y[, perm])))
+  X <- t(scale(t(X)))
+  Y <- t(scale(t(Y)))
   
   G <- nrow(Y)  # number of genes
   K <- nrow(X)  # max number of possible predictors (number of TFs)
@@ -28,9 +22,9 @@ BBSR <- function(X, Y, Pi, clr.mat, nS, no.pr.val, weights.mat, cores) {
     clr.order <- order(clr.mat[ind, ], decreasing=TRUE)
     pp[ind, clr.order[1:min(K, nS)]] <- TRUE
   }
+  diag(pp) <- FALSE
   
   out.list <- mclapply(1:G, BBSRforOneGene, X, Y, pp, weights.mat, nS, mc.cores=cores)
-  
   return(out.list)
 }
 

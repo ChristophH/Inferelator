@@ -16,6 +16,7 @@ source('R_scripts/mi_and_clr.R')
 source('R_scripts/bayesianRegression.R')
 source('R_scripts/men.R')
 source('R_scripts/evaluate.R')
+source('R_scripts/tfa.R')
 
 
 date.time.str <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
@@ -54,6 +55,8 @@ PARS$eval.on.subset <- FALSE
 PARS$method <- 'BBSR'  # 'BBSR' or 'MEN'
 PARS$prior.weight <- 1
 
+PARS$use.tfa <- FALSE
+
 
 # some of the elastic net parameters that are essentially constants;
 # only override in config script if you know what you are doing
@@ -70,7 +73,9 @@ args <- commandArgs(trailingOnly = TRUE)
 if (length(args) == 1) {
   job.cfg <- args[1]
 } else {
-  job.cfg <- NULL
+  job.cfg <- 'jobs/bsusnew_60_15_15_bbsr1_t.R'
+  job.cfg <- 'jobs/jesse_100.R'
+  job.cfg <- 'jobs/gnw.R'
 }
 
 # load job specific parameters from input config file
@@ -161,11 +166,9 @@ IN$final_response_matrix <- x[[1]]
 IN$final_design_matrix <- x[[2]]
 resp.idx <- x[[3]]
 
-X <- IN$final_design_matrix
-Y <- IN$final_response_matrix
 
-if (nrow(X) > 6000) {
-  X <- X[IN$tf.names, ]  # speeds up MI calculation for large datasets
+if (!all(apply(resp.idx, 1, identical, resp.idx[1,]))) {
+    stop('This version of the Inferelator does not support biclusters. Sorry.')
 }
     
 
@@ -173,14 +176,15 @@ if (nrow(X) > 6000) {
 # set up the bootstrap permutations
 ##  .-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.
 
-IN$bs.pi <- list()
+IN$bs.pi <- matrix(0, nrow=PARS$num.boots, ncol=ncol(resp.idx))
 if (PARS$num.boots == 1) {
-  IN$bs.pi[[1]] <- resp.idx
+  IN$bs.pi[1, ] <- resp.idx[1, ]
 } else {
   for (bootstrap in 1:PARS$num.boots) {
-    IN$bs.pi[[bootstrap]] <- resp.idx[, sample(ncol(resp.idx), replace=TRUE)]
+    IN$bs.pi[bootstrap, ] <- resp.idx[1, sample(ncol(resp.idx), replace=TRUE)]
   }
 }
+
 
 ##  .-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.
 # parse priors parameters and set up priors list
@@ -189,7 +193,6 @@ if (PARS$num.boots == 1) {
 priors <- getPriors(IN$exp.mat, IN$tf.names, IN$priors.mat, IN$gs.mat, 
                     PARS$eval.on.subset, PARS$job.seed, PARS$perc.tp, 
                     PARS$perm.tp, PARS$perc.fp, PARS$perm.fp)
-
 
 
 ##  .-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.
@@ -220,32 +223,41 @@ for (prior.name in names(priors)) {
   for (bootstrap in 1:PARS$num.boots) {
     cat("Bootstrap", bootstrap, "of", PARS$num.boots, "\n")
     
+    # set up bootstrap specific design and response
+    X <- IN$final_design_matrix[, IN$bs.pi[bootstrap, ]]
+    Y <- IN$final_response_matrix[, IN$bs.pi[bootstrap, ]]
+
+    if (nrow(X) > 6000) {
+      X <- X[IN$tf.names, ]  # speeds up MI calculation for large datasets
+    }
+    
+    if(PARS$use.tfa) {
+      X <- tfa(prior, Y, X, PARS$cores)
+    }
+
     # fill mutual information matrices
     cat("Calculating MI\n")	
-    Ms <- mi(t(Y), t(X), 
-             nbins=PARS$mi.bins, cpu.n=PARS$cores, perm.mat=t(IN$bs.pi[[bootstrap]]))
+    Ms <- mi(t(Y), t(X), nbins=PARS$mi.bins, cpu.n=PARS$cores)
     diag(Ms) <- 0
     cat("Calculating Background MI\n")
-    Ms_bg <- mi(t(X), t(X), 
-                nbins=PARS$mi.bins, cpu.n=PARS$cores, perm.mat=t(IN$bs.pi[[bootstrap]]))
+    Ms_bg <- mi(t(X), t(X), nbins=PARS$mi.bins, cpu.n=PARS$cores)
     diag(Ms_bg) <- 0
     
     # get CLR matrix
     cat("Calculating CLR Matrix\n")
     clr.mat = mixedCLR(Ms_bg,Ms)
-    colnames(clr.mat) <- rownames(X)
-    rownames(clr.mat) <- rownames(Y)
+    dimnames(clr.mat) <- list(rownames(Y), rownames(X))
     clr.mat <- clr.mat[, IN$tf.names]
     
     # get the sparse ODE models
     X <- X[IN$tf.names, ]
     cat('Calculating sparse ODE models\n')
     if (PARS$method == 'BBSR') {
-      x <- BBSR(X, Y, IN$bs.pi[[bootstrap]], clr.mat, PARS$max.preds, 
-                no.pr.weight, weights.mat, PARS$cores)
+      x <- BBSR(X, Y, clr.mat, PARS$max.preds, no.pr.weight, weights.mat, 
+                PARS$cores)
     }
     if (PARS$method == 'MEN' ) {
-      x <- mclapply(1:nrow(Y), callMEN, Xs=X, Y=Y, Pi=IN$bs.pi[[bootstrap]], 
+      x <- mclapply(1:nrow(Y), callMEN, Xs=X, Y=Y, 
                     clr.mat=clr.mat, nS=PARS$max.preds, nCv=PARS$enet.nCv,
                     lambda=PARS$enet.lambda, verbose=PARS$enet.verbose, 
                     plot.it=PARS$enet.plot.it, 
@@ -256,13 +268,14 @@ for (prior.name in names(priors)) {
     cat('\n')
     
     # our output will be a list holding two matrices: betas and betas.resc
-    bs.betas <- Matrix(0, nrow(Y), nrow(X))
-    bs.betas.resc <- Matrix(0, nrow(Y), nrow(X))
+    bs.betas <- Matrix(0, nrow(Y), nrow(X), 
+                       dimnames=list(rownames(Y), rownames(X)))
+    bs.betas.resc <- Matrix(0, nrow(Y), nrow(X), 
+                            dimnames=list(rownames(Y), rownames(X)))
     for (res in x) {
       bs.betas[res$ind, res$pp] <- res$betas
       bs.betas.resc[res$ind, res$pp] <- res$betas.resc
     }
-	  
     betas[[bootstrap]] <- bs.betas
     betas.resc[[bootstrap]] <- bs.betas.resc
     
@@ -273,12 +286,12 @@ for (prior.name in names(priors)) {
   
   # rank-combine the rescaled betas (confidence scores) of the bootstraps
   confs.file <- sub('/betas_', '/combinedconf_', res.file)
-  comb.confs <- Matrix(0, nrow(betas.resc[[1]]), ncol(betas.resc[[1]]))
+  comb.confs <- Matrix(0, nrow(betas.resc[[1]]), ncol(betas.resc[[1]]), 
+                       dimnames=dimnames(betas.resc[[1]]))
   for (beta.resc in betas.resc) {
     comb.confs <- comb.confs + rank(as.matrix(beta.resc), ties.method='average')
   }
   save(comb.confs, file=confs.file)
-  
   
 }  # end prior.name loop
 

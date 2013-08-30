@@ -21,4 +21,4 @@ PARS$eval.on.subset <- FALSE
 PARS$method <- 'BBSR'
 PARS$prior.weight <- NULL
 
-PARS$save.to.dir <- paste('output/dream4', PARS$method, PARS$prior.weight, sep='_')
+PARS$save.to.dir <- paste('output/dream4_110_0_45', PARS$method, PARS$prior.weight, sep='_')

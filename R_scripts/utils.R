@@ -55,8 +55,12 @@ read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file,
   
   IN$priors.mat <- NULL
   if (!is.null(priors.file)) {
-    IN$priors.mat <- as.matrix(read.table(file=file.path(input.dir, priors.file),
-                                    row.names=1, header=T, sep='\t', check.names=F))
+    if (grepl('.RData$', priors.file)) {
+      IN$priors.mat <- local(get(load(file.path(input.dir, priors.file))))
+    } else {
+      IN$priors.mat <- as.matrix(read.table(file=file.path(input.dir, priors.file),
+                                 row.names=1, header=T, sep='\t', check.names=F))
+    }
   }
   IN$gs.mat <- NULL
   if (!is.null(gold.standard.file)) {

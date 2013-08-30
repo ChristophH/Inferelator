@@ -1,6 +1,6 @@
 require('elasticnet')
 
-callMEN <- function(ind, Xs, Y, Pi, clr.mat, nS, 
+callMEN <- function(ind, Xs, Y, clr.mat, nS, 
                     nCv = 10,lambda = 0, 
                     sparseModels=T, 	
                     verbose = FALSE, 
@@ -14,16 +14,16 @@ callMEN <- function(ind, Xs, Y, Pi, clr.mat, nS,
   
   #since we do cross-validation, we
   #need to get only the unique condtions
-  uniqConds <- Pi[ind, ]
-  uniqConds <- uniqConds[!duplicated(uniqConds) & uniqConds != 0 & !is.na(uniqConds)]
+  #uniqConds <- Pi
+  #uniqConds <- uniqConds[!duplicated(uniqConds) & uniqConds != 0 & !is.na(uniqConds)]
   
   #Y     <- t(scale(t(Y[, Pi[ind, uniqConds]])))
-  Y     <- Y[, Pi[ind, uniqConds]]
+  Y      <- unique(Y, MARGIN=2)
   #Y     <- Y[, Pi[ind, uniqConds]]
   Y_ind <- Y[ind, ]
   
   #Xs <- t(scale(t(Xs[, Pi[ind, uniqConds]])))#
-  Xs <- Xs[, Pi[ind, uniqConds]]
+  Xs <- unique(Xs, MARGIN=2)
   #Xs <- Xs[, Pi[ind, uniqConds]]
   
   #setting which predictors we consider
