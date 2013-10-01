@@ -18,9 +18,10 @@ BBSR <- function(X, Y, clr.mat, nS, no.pr.val, weights.mat, cores) {
   pp[weights.mat != no.pr.val] <- TRUE
   
   # for each gene, add the top nS predictors of the list to possible predictors
+  clr.mat[clr.mat == 0] <- NA
   for (ind in 1:G) {
-    clr.order <- order(clr.mat[ind, ], decreasing=TRUE)
-    pp[ind, clr.order[1:min(K, nS)]] <- TRUE
+    clr.order <- order(clr.mat[ind, ], decreasing=TRUE, na.last=NA)
+    pp[ind, clr.order[1:min(K, nS, length(clr.order))]] <- TRUE
   }
   diag(pp) <- FALSE
   
@@ -34,19 +35,25 @@ BBSRforOneGene <- function(ind, X, Y, pp, weights.mat, nS) {
   }
   
   pp.i <- pp[ind, ]
+  
+  if (sum(pp.i) == 0) {
+    return(list(ind=ind, pp=rep(TRUE, length(pp.i)), betas=0, betas.resc=0))
+  }
+
   # create BestSubsetRegression input  
   y <- as.vector(Y[ind, ], mode="numeric")
-  x <- t(as.matrix(X[pp.i, ]))
-  g <- weights.mat[ind, pp.i]
+  x <- t(matrix(X[pp.i, ], ncol=ncol(X)))
+  g <- matrix(weights.mat[ind, pp.i], ncol=sum(pp.i))
   
   # experimental stuff
   spp <- ReduceNumberOfPredictors(y, x, g, nS)
   pp.i[pp.i == TRUE] <- spp
-  x <- t(as.matrix(X[pp.i, ]))
-  g <- weights.mat[ind, pp.i]
+  x <- t(matrix(X[pp.i, ], ncol=ncol(X)))
+  g <- matrix(weights.mat[ind, pp.i], ncol=sum(pp.i))
   
   betas <- BestSubsetRegression(y, x, g)
   betas.resc <- PredErrRed(y, x, betas)
+  
   return(list(ind=ind, pp=pp.i, betas=betas, betas.resc=betas.resc))
 }
 

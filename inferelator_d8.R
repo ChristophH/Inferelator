@@ -16,7 +16,7 @@ source('R_scripts/mi_and_clr.R')
 source('R_scripts/bayesianRegression.R')
 source('R_scripts/men.R')
 source('R_scripts/evaluate.R')
-source('R_scripts/tfa.R')
+source('R_scripts/dream8_out.R')
 
 
 date.time.str <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
@@ -55,7 +55,6 @@ PARS$eval.on.subset <- FALSE
 PARS$method <- 'BBSR'  # 'BBSR' or 'MEN'
 PARS$prior.weight <- 1
 
-PARS$use.tfa <- FALSE
 
 
 # some of the elastic net parameters that are essentially constants;
@@ -73,8 +72,8 @@ args <- commandArgs(trailingOnly = TRUE)
 if (length(args) == 1) {
   job.cfg <- args[1]
 } else {
-  job.cfg <- 'jobs/bsusnew_60_15_15_bbsr1_t.R'
-  job.cfg <- '/home/ch1421/Projects/DREAM8/inferelator_jobs/insilico.R'
+  #job.cfg <- '/home/ch1421/Projects/DREAM8/inferelator_jobs/insilico.R'
+  job.cfg <- '/home/ch1421/Projects/DREAM8/inferelator_jobs/BT20_EGF.cfg'
 }
 
 # load job specific parameters from input config file
@@ -247,10 +246,6 @@ for (prior.name in names(priors)) {
     if (nrow(X) > 6000) {
       X <- X[IN$tf.names, ]  # speeds up MI calculation for large datasets
     }
-    
-    if(PARS$use.tfa) {
-      X <- tfa(prior, Y, X, PARS$cores)
-    }
 
     # fill mutual information matrices
     cat("Calculating MI\n")	
@@ -341,9 +336,9 @@ for (prior.name in names(priors)) {
       }
     }
   }
-
-
   
+  dream8.out(scores, levels(IN$meta.data$Celltype), levels(IN$meta.data$Stimulus))
+
 }  # end prior.name loop
 
 save(PARS, IN, SEED, file = paste(PARS$save.to.dir, "/params_and_input.RData", sep=""))
