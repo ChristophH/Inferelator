@@ -249,6 +249,20 @@ for (prior.name in names(priors)) {
     dimnames(clr.mat) <- list(rownames(Y), rownames(X))
     clr.mat <- clr.mat[, IN$tf.names]
     
+    # DREAM8 induced change:
+    for (tf1 in IN$tf.names) {
+      for (tf2 in IN$tf.names) {
+        if (tf1 != tf2) {
+          #if (clr.mat[tf1, tf2] > clr.mat[tf2, tf1]) {
+          if (Ms[tf1, tf2] > Ms[tf2, tf1]) {
+            clr.mat[tf2, tf1] <- min(clr.mat)
+          } else if (Ms[tf1, tf2] < Ms[tf2, tf1]) {
+            clr.mat[tf1, tf2] <- min(clr.mat)
+          }
+        }
+      }
+    }
+    
     # get the sparse ODE models
     X <- X[IN$tf.names, ]
     cat('Calculating sparse ODE models\n')
