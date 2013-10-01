@@ -74,7 +74,8 @@ if (length(args) == 1) {
   job.cfg <- args[1]
 } else {
   job.cfg <- 'jobs/bsusnew_60_15_15_bbsr1_t.R'
-  job.cfg <- '/home/ch1421/Projects/DREAM8/inferelator_jobs/insilico.R'
+  job.cfg <- 'jobs/jesse_100.R'
+  job.cfg <- 'jobs/gnw.R'
 }
 
 # load job specific parameters from input config file
@@ -193,24 +194,6 @@ priors <- getPriors(IN$exp.mat, IN$tf.names, IN$priors.mat, IN$gs.mat,
                     PARS$eval.on.subset, PARS$job.seed, PARS$perc.tp, 
                     PARS$perm.tp, PARS$perc.fp, PARS$perm.fp)
 
-# experimental TODO: remove
-X <- IN$final_design_matrix
-Y <- IN$final_response_matrix
-mi.xy <- mi(t(X), t(Y), nbins=PARS$mi.bins, cpu.n=PARS$cores)
-mi.yx <- mi(t(Y), t(X), nbins=PARS$mi.bins, cpu.n=PARS$cores)
-diag(mi.xy) <- NA
-diag(mi.yx) <- NA
-mi.mean <- (mi.xy + mi.yx) / 2
-mi.diff <- mi.yx - mi.xy
-dev.new()
-plot(range(mi.mean, na.rm=TRUE), range(mi.diff, na.rm=TRUE), type='n')
-for (i in 1:(ncol(mi.mean)-1)) {
-  for (j in (i+1):ncol(mi.mean)) {
-    text(mi.mean[i, j], mi.diff[j, i], labels=paste(i, j, sep=','), cex=0.5)
-  }
-}
-
-
 
 ##  .-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.***.-.-.
 # main loop
@@ -266,20 +249,6 @@ for (prior.name in names(priors)) {
     dimnames(clr.mat) <- list(rownames(Y), rownames(X))
     clr.mat <- clr.mat[, IN$tf.names]
     
-    # DREAM8 induced change:
-    for (tf1 in IN$tf.names) {
-      for (tf2 in IN$tf.names) {
-        if (tf1 != tf2) {
-          #if (clr.mat[tf1, tf2] > clr.mat[tf2, tf1]) {
-          if (Ms[tf1, tf2] > Ms[tf2, tf1]) {
-            clr.mat[tf2, tf1] <- min(clr.mat)
-          } else if (Ms[tf1, tf2] < Ms[tf2, tf1]) {
-            clr.mat[tf1, tf2] <- min(clr.mat)
-          }
-        }
-      }
-    }
-    
     # get the sparse ODE models
     X <- X[IN$tf.names, ]
     cat('Calculating sparse ODE models\n')
@@ -323,26 +292,6 @@ for (prior.name in names(priors)) {
     comb.confs <- comb.confs + rank(as.matrix(beta.resc), ties.method='average')
   }
   save(comb.confs, file=confs.file)
-  
-  # DREAM8 specific addition
-  max.comb.conf <- length(betas) * length(betas[[1]])
-  #scores <- as.matrix((comb.confs-min(comb.confs))/(max(comb.confs)-min(comb.confs)))
-  scores <- as.matrix((comb.confs-min(comb.confs))/(max.comb.conf-min(comb.confs)))
-  write.table(round(scores, 2), gsub('.RData', '.tsv', confs.file), quote=FALSE, sep='\t', row.names=TRUE, col.names=TRUE)
-  write.table(scores, gsub('.RData', '_unrounded.tsv', confs.file), quote=FALSE, sep='\t', row.names=TRUE, col.names=TRUE)
-  dev.new()
-  plot(c(0,1), c(0,1), type='n')
-  for (i in 1:(ncol(scores)-1)) {
-    for (j in (i+1):ncol(scores)) {
-      if (scores[i, j] > 0 & scores[j, i] > 0) {
-        cat(i, j, scores[i, j], scores[j, i], '\n')
-        #points(scores[i, j], scores[j, i])
-        text(scores[i, j], scores[j, i], labels=paste(i, j, sep=','), cex=0.5)
-      }
-    }
-  }
-
-
   
 }  # end prior.name loop
 
