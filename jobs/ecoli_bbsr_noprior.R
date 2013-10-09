@@ -5,7 +5,7 @@ PARS$priors.file <- 'gold_standard.tsv'
 PARS$gold.standard.file <- 'gold_standard.tsv'
 
 PARS$num.boots <- 20
-PARS$cores <- 12
+PARS$cores <- 8
 
 PARS$delT.max <- 270
 PARS$delT.min <- 30

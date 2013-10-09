@@ -33,6 +33,8 @@ PARS$meta.data.file <- NULL
 PARS$priors.file <- NULL
 PARS$gold.standard.file <- NULL
 PARS$leave.out.file <- NULL
+PARS$sc.file <- NULL
+
 
 PARS$job.seed <- 42  # set to NULL if a random seed should be used
 PARS$save.to.dir <- NULL
@@ -73,7 +75,9 @@ args <- commandArgs(trailingOnly = TRUE)
 if (length(args) == 1) {
   job.cfg <- args[1]
 } else {
-  job.cfg <- NULL
+  #job.cfg <- 'jobs/ecoli_bbsr_noprior.R'
+  job.cfg <- 'jobs/dream4_bbsr_noprior.R'
+  job.cfg <- 'jobs/dream4_bbsr_noprior_sc.R'
 }
 
 # load job specific parameters from input config file
@@ -85,7 +89,7 @@ if (!is.null(job.cfg)) {
 # read input data
 IN <- read.input(PARS$input.dir, PARS$exp.mat.file, PARS$tf.names.file, 
                  PARS$meta.data.file, PARS$priors.file, PARS$gold.standard.file,
-                 PARS$leave.out.file)
+                 PARS$leave.out.file, PARS$sc.file)
 
 # keep only TFs that are part of the expression data
 IN$tf.names <- IN$tf.names[IN$tf.names %in% rownames(IN$exp.mat)]
@@ -98,6 +102,9 @@ gene.order <- c(gene.order[match(IN$tf.names, gene.order)],
 IN$exp.mat <- IN$exp.mat[gene.order, ]
 if (!is.null(IN$priors.mat)) {
   IN$priors.mat <- IN$priors.mat[gene.order, IN$tf.names]
+}
+if (!is.null(IN$sc.mat)) {
+  IN$sc.mat <- IN$sc.mat[gene.order, IN$tf.names]
 }
 if (!is.null(IN$gs.mat)) {
   IN$gs.mat <- IN$gs.mat[gene.order, IN$tf.names]
@@ -266,7 +273,7 @@ for (prior.name in names(priors)) {
     cat('Calculating sparse ODE models\n')
     if (PARS$method == 'BBSR') {
       x <- BBSR(X, Y, clr.mat, PARS$max.preds, no.pr.weight, weights.mat, 
-                PARS$cores)
+                IN$sc.mat, PARS$cores)
     }
     if (PARS$method == 'MEN' ) {
       x <- mclapply(1:nrow(Y), callMEN, Xs=X, Y=Y, 

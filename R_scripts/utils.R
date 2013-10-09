@@ -25,7 +25,8 @@ trivial.meta.data <- function(cond.names) {
 }
 
 read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file, 
-                       priors.file, gold.standard.file, leave.out.file) {
+                       priors.file, gold.standard.file, leave.out.file, 
+                       sc.file) {
   IN <- list()
   
   if (grepl('.RData$', exp.mat.file)) {
@@ -51,6 +52,13 @@ read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file,
     IN$meta.data.lo <- IN$meta.data[lo, ]
     IN$exp.mat <- as.matrix(IN$exp.mat[, !lo])
     IN$meta.data <- IN$meta.data[!lo, ]
+  }
+  
+  # read the sign constraint matrix from file
+  IN$sc.mat <- NULL
+  if (!is.null(sc.file)) {
+    IN$sc.mat <- as.matrix(read.table(file=file.path(input.dir, sc.file),
+                           row.names=1, header=T, sep='\t', check.names=F))
   }
   
   IN$priors.mat <- NULL
