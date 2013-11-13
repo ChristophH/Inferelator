@@ -57,6 +57,10 @@ BBSRforOneGene <- function(ind, X, Y, pp, weights.mat, sc.mat, nS) {
   pp.i[pp.i == TRUE] <- spp
   x <- t(matrix(X[pp.i, ], ncol=ncol(X)))
   g <- matrix(weights.mat[ind, pp.i], ncol=sum(pp.i))
+  if (!is.null(sc.mat)) {
+    sc <- sc.mat[ind, pp.i]
+  }
+  
   
   betas <- BestSubsetRegression(y, x, g, sc)
   betas.resc <- PredErrRed(y, x, betas, sc)
@@ -67,7 +71,7 @@ BBSRforOneGene <- function(ind, X, Y, pp, weights.mat, sc.mat, nS) {
 
 ReduceNumberOfPredictors <- function(y, x, g, n, sc) {
   K <- ncol(x)
-  spp <- 
+  
   if (K <= n) {
     return(rep(TRUE, K))
   }

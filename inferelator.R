@@ -14,12 +14,13 @@ source('R_scripts/design_and_response.R')
 source('R_scripts/priors.R')
 source('R_scripts/mi_and_clr.R')
 source('R_scripts/bayesianRegression.R')
-source('R_scripts/men.R')
+#source('R_scripts/men.R')
 source('R_scripts/evaluate.R')
-source('R_scripts/tfa.R')
+#source('R_scripts/tfa.R')
 
 
 date.time.str <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
+cat(date.time.str, '\n')
 
 
 # default job parameters
@@ -76,8 +77,11 @@ if (length(args) == 1) {
   job.cfg <- args[1]
 } else {
   #job.cfg <- 'jobs/ecoli_bbsr_noprior.R'
-  job.cfg <- 'jobs/dream4_bbsr_noprior.R'
-  job.cfg <- 'jobs/dream4_bbsr_noprior_sc.R'
+  #job.cfg <- 'jobs/dream4_bbsr_noprior.R'
+  #job.cfg <- 'jobs/dream4_bbsr_noprior_sc.R'
+  #job.cfg <- '/home/ch1421/Projects/Whole_Tree_Now/Inferelator_Jobs/immgen_prior_bbsr_1200000.R'
+  #job.cfg <- 'jobs/bsubtilis_us_2013_allTfs_bbsr_low_sc.R'
+  job.cfg <- 'jobs/bsubtilis_eu_201310_bbsr_1.R'
 }
 
 # load job specific parameters from input config file
@@ -241,24 +245,31 @@ for (prior.name in names(priors)) {
     }
 
     # fill mutual information matrices
-    cat("Calculating MI\n")	
+    cat("Calculating MI ... ")	
     Ms <- mi(t(Y), t(X), nbins=PARS$mi.bins, cpu.n=PARS$cores)
+    cat("Done\n")
     diag(Ms) <- 0
-    cat("Calculating Background MI\n")
+    cat("Calculating Background MI ... ")
     Ms_bg <- mi(t(X), t(X), nbins=PARS$mi.bins, cpu.n=PARS$cores)
+    cat("Done\n")
     diag(Ms_bg) <- 0
     
     # get CLR matrix
-    cat("Calculating CLR Matrix\n")
+    cat("Calculating CLR Matrix ... ")
     clr.mat = mixedCLR(Ms_bg,Ms)
+    cat("Done\n")
     dimnames(clr.mat) <- list(rownames(Y), rownames(X))
     clr.mat <- clr.mat[, IN$tf.names]
     
     # DREAM8 induced change:
-    for (tf1 in IN$tf.names) {
-      for (tf2 in IN$tf.names) {
-        if (tf1 != tf2) {
-          #if (clr.mat[tf1, tf2] > clr.mat[tf2, tf1]) {
+    #if (!isSymmetric(Ms[IN$tf.names, IN$tf.names])) {
+    if (1 == 0) {
+      # TODO make this more efficient
+      cat("Fix directionality based on MI ... ")
+      for (j in 2:length(IN$tf.names)) {
+        for (i in 1:(j-1)) {
+          tf1 <- IN$tf.names[i]
+          tf2 <- IN$tf.names[j]
           if (Ms[tf1, tf2] > Ms[tf2, tf1]) {
             clr.mat[tf2, tf1] <- min(clr.mat)
           } else if (Ms[tf1, tf2] < Ms[tf2, tf1]) {
@@ -266,6 +277,7 @@ for (prior.name in names(priors)) {
           }
         }
       }
+      cat("Done\n")
     }
     
     # get the sparse ODE models
