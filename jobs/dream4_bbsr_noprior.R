@@ -4,8 +4,8 @@ PARS$meta.data.file <- 'meta_data.tsv'
 PARS$priors.file <- 'gold_standard.tsv'
 PARS$gold.standard.file <- 'gold_standard.tsv'
 
-PARS$num.boots <- 50
-PARS$cores <- 12
+PARS$num.boots <- 20
+PARS$cores <- 8
 
 PARS$delT.max <- 110
 PARS$delT.min <- 0
@@ -21,4 +21,4 @@ PARS$eval.on.subset <- FALSE
 PARS$method <- 'BBSR'
 PARS$prior.weight <- NULL
 
-PARS$save.to.dir <- paste('output/dream4_110_0_45', PARS$method, PARS$prior.weight, sep='_')
+PARS$save.to.dir <- paste('output/dream4_110_0_45_cliftest', PARS$method, PARS$prior.weight, sep='_')

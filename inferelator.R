@@ -17,6 +17,7 @@ source('R_scripts/bayesianRegression.R')
 source('R_scripts/men.R')
 source('R_scripts/evaluate.R')
 source('R_scripts/tfa.R')
+source('R_scripts/clif.R')
 
 
 date.time.str <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
@@ -73,7 +74,7 @@ args <- commandArgs(trailingOnly = TRUE)
 if (length(args) == 1) {
   job.cfg <- args[1]
 } else {
-  job.cfg <- NULL
+  job.cfg <- 'jobs/dream4_bbsr_noprior.R'
 }
 
 # load job specific parameters from input config file
@@ -247,26 +248,15 @@ for (prior.name in names(priors)) {
     dimnames(clr.mat) <- list(rownames(Y), rownames(X))
     clr.mat <- clr.mat[, IN$tf.names]
     
-    # DREAM8 induced change:
-    for (tf1 in IN$tf.names) {
-      for (tf2 in IN$tf.names) {
-        if (tf1 != tf2) {
-          #if (clr.mat[tf1, tf2] > clr.mat[tf2, tf1]) {
-          if (Ms[tf1, tf2] > Ms[tf2, tf1]) {
-            clr.mat[tf2, tf1] <- min(clr.mat)
-          } else if (Ms[tf1, tf2] < Ms[tf2, tf1]) {
-            clr.mat[tf1, tf2] <- min(clr.mat)
-          }
-        }
-      }
-    }
-    
+
     # get the sparse ODE models
     X <- X[IN$tf.names, ]
     cat('Calculating sparse ODE models\n')
     if (PARS$method == 'BBSR') {
-      x <- BBSR(X, Y, clr.mat, PARS$max.preds, no.pr.weight, weights.mat, 
-                PARS$cores)
+      #x <- BBSR(X, Y, clr.mat, PARS$max.preds, no.pr.weight, weights.mat, 
+      #          PARS$cores)
+      x <- clif(X, Y, clr.mat, PARS$max.preds, no.pr.weight, weights.mat, 
+             PARS$cores)
     }
     if (PARS$method == 'MEN' ) {
       x <- mclapply(1:nrow(Y), callMEN, Xs=X, Y=Y, 
