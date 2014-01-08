@@ -38,7 +38,7 @@ getPriors <- function(exp.mat, tf.names, priors.mat, gs.mat, eval.on.subset,
   for (i in 1:length(priors.pars)) {
     pp <- priors.pars[[i]]
     
-    priors[[i]] <- matrix(0, nrow(exp.mat), length(tf.names))
+    priors[[i]] <- matrix(0, nrow(exp.mat), length(tf.names), dimnames=dimnames(priors.mat))
     names(priors)[i] <- paste('frac_tp_', pp[1], '_perm_', pp[2], '--frac_fp_', 
                               pp[3], '_perm_', pp[4], sep="")
     
@@ -90,13 +90,18 @@ makePriorMat <- function(priors, perc, perm, false.priors = FALSE) {
   rng.state <- .Random.seed
 
   set.seed(perm, "Mersenne-Twister", "Inversion")
-  prior.order <- sample(which(priors == !false.priors))
 
-  n.priors <- floor(sum(priors) * perc / 100)
+  n.priors <- floor(sum(priors != 0) * perc / 100)
   p.mat <- matrix(0, nrow(priors), ncol(priors))
   
   if (n.priors > 0) {
-    p.mat[prior.order[1:n.priors]] <- (-1)^false.priors
+    if (false.priors) {
+      prior.order <- sample(which(priors == 0))
+      p.mat[prior.order[1:n.priors]] <- sample(priors[priors != 0], n.priors, replace=TRUE)
+    } else {
+      prior.order <- sample(which(priors != 0))
+      p.mat[prior.order[1:n.priors]] <- priors[prior.order[1:n.priors]]
+    }
   }
 
   # The above code ignores whether perc is set too high, but we should warn

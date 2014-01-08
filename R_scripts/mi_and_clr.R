@@ -5,7 +5,7 @@ discretize <- function(X, nbins) {
   N <- length(X)
   X.min <- min(X)
   X.max <- max(X)
-  tiny <- .Machine$double.eps * (X.max - X.min)
+  tiny <- max(.Machine$double.eps * (X.max - X.min), .Machine$double.eps)
   X.disc <- floor((X - X.min) / (X.max - X.min + tiny) * nbins)
   return(as.integer(X.disc))
 }
@@ -26,7 +26,7 @@ mi <- function(x, y, nbins=10, cpu.n=1, perm.mat=NULL) {
   # discretize the columns
   x <- apply(x, 2, discretize, nbins)
   y <- apply(y, 2, discretize, nbins)
-
+  
   m <- ncol(x)
   n <- ncol(y)
   ret <- matrix(0, m, n, dimnames=list(colnames(x), colnames(y)))
@@ -112,5 +112,7 @@ mixedCLR <- function(mi.stat, mi.dyn) {
   }
   z.c.mix[z.c.mix < 0] <- 0
   
-  return(sqrt(z.r.dyn ^ 2 + z.c.mix ^ 2))
+  mclr <- sqrt(z.r.dyn ^ 2 + z.c.mix ^ 2)
+  mclr[is.nan(mclr)] <- NA
+  return(mclr)
 }

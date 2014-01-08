@@ -8,6 +8,7 @@
 require(Matrix)
 
 rm(list=ls())
+gc()
 
 source('R_scripts/utils.R')
 source('R_scripts/design_and_response.R')
@@ -20,7 +21,7 @@ source('R_scripts/tfa.R')
 
 
 date.time.str <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
-
+print(date.time.str)
 
 # default job parameters
 PARS <- list()
@@ -55,7 +56,7 @@ PARS$eval.on.subset <- FALSE
 PARS$method <- 'BBSR'  # 'BBSR' or 'MEN'
 PARS$prior.weight <- 1
 
-PARS$use.tfa <- FALSE
+PARS$use.tfa <- TRUE
 
 
 # some of the elastic net parameters that are essentially constants;
@@ -73,7 +74,9 @@ args <- commandArgs(trailingOnly = TRUE)
 if (length(args) == 1) {
   job.cfg <- args[1]
 } else {
-  job.cfg <- NULL
+  #job.cfg <- 'jobs/bsubtilis_eu_201310_stfa_bbsr_22.R'
+  #job.cfg <- 'jobs/bsubtilis_eu_201310_stfa_bbsr_1_tp0_fp0.R'
+  job.cfg <- '/home/ch1421/Projects/Rice/inferelator_jobs/olivia_small.R'
 }
 
 # load job specific parameters from input config file
@@ -218,6 +221,7 @@ for (prior.name in names(priors)) {
   
   betas <- list()
   betas.resc <- list()
+  tf.activities <- list()
   for (bootstrap in 1:PARS$num.boots) {
     cat("Bootstrap", bootstrap, "of", PARS$num.boots, "\n")
     
@@ -231,6 +235,7 @@ for (prior.name in names(priors)) {
     
     if(PARS$use.tfa) {
       X <- tfa(prior, Y, X, PARS$cores)
+      tf.activities[[bootstrap]] <- X
     }
 
     # fill mutual information matrices
@@ -248,18 +253,18 @@ for (prior.name in names(priors)) {
     clr.mat <- clr.mat[, IN$tf.names]
     
     # DREAM8 induced change:
-    for (tf1 in IN$tf.names) {
-      for (tf2 in IN$tf.names) {
-        if (tf1 != tf2) {
-          #if (clr.mat[tf1, tf2] > clr.mat[tf2, tf1]) {
-          if (Ms[tf1, tf2] > Ms[tf2, tf1]) {
-            clr.mat[tf2, tf1] <- min(clr.mat)
-          } else if (Ms[tf1, tf2] < Ms[tf2, tf1]) {
-            clr.mat[tf1, tf2] <- min(clr.mat)
-          }
-        }
-      }
-    }
+    #for (tf1 in IN$tf.names) {
+    #  for (tf2 in IN$tf.names) {
+    #    if (tf1 != tf2) {
+    #      #if (clr.mat[tf1, tf2] > clr.mat[tf2, tf1]) {
+    #      if (Ms[tf1, tf2] > Ms[tf2, tf1]) {
+    #        clr.mat[tf2, tf1] <- min(clr.mat)
+    #      } else if (Ms[tf1, tf2] < Ms[tf2, tf1]) {
+    #        clr.mat[tf1, tf2] <- min(clr.mat)
+    #      }
+    #    }
+    #  }
+    #}
     
     # get the sparse ODE models
     X <- X[IN$tf.names, ]
@@ -294,7 +299,7 @@ for (prior.name in names(priors)) {
   }  # end bootstrap for loop
   
   res.file <- paste(PARS$save.to.dir, "/betas_", prior.name, "_", PARS$prior.weight, ".RData", sep="")
-  save(betas, betas.resc, file = res.file)
+  save(betas, betas.resc, tf.activities, file = res.file)
   
   # rank-combine the rescaled betas (confidence scores) of the bootstraps
   confs.file <- sub('/betas_', '/combinedconf_', res.file)

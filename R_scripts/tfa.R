@@ -27,10 +27,11 @@ tfa <- function(prior, res.mat, des.mat, cores) {
   diag(prior) <- 0
   #cor.mat <- cor(t(res.mat), t(des.mat[colnames(prior), ]))
   #prior <- prior * sign(cor.mat)
-  dn <- dimnames(prior)
-  betas <- refit.betas.mc(des.mat[colnames(prior), ], res.mat, prior, cores)
-  prior <- betas[, -1]
-  dimnames(prior) <- dn
+  
+  #dn <- dimnames(prior)
+  #betas <- refit.betas.mc(des.mat[colnames(prior), ], res.mat, prior, cores)
+  #prior <- betas[, -1]
+  #dimnames(prior) <- dn
   prior.fixed <- fix.pki(prior)
   
   #abs.col.avg <- apply(abs(prior.fixed), 2, sum) / apply(prior.fixed != 0, 2, sum)

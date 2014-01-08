@@ -4,7 +4,7 @@
 ###############################################################################
 
 BBSR <- function(X, Y, clr.mat, nS, no.pr.val, weights.mat, cores) {
-
+  
   # Scale and permute design and response matrix
   X <- t(scale(t(X)))
   Y <- t(scale(t(Y)))
@@ -12,10 +12,10 @@ BBSR <- function(X, Y, clr.mat, nS, no.pr.val, weights.mat, cores) {
   G <- nrow(Y)  # number of genes
   K <- nrow(X)  # max number of possible predictors (number of TFs)
   
-  pp <- matrix(FALSE, G, K)  # predictors that will be used in the regression
+  pp <- matrix(FALSE, G, K, dimnames=list(rownames(Y), rownames(X)))  # predictors that will be used in the regression
   
   # keep all predictors that we have priors for
-  pp[weights.mat != no.pr.val] <- TRUE
+  pp[(weights.mat != no.pr.val) & !is.na(clr.mat)] <- TRUE
   
   # for each gene, add the top nS predictors of the list to possible predictors
   clr.mat[clr.mat == 0] <- NA
@@ -24,6 +24,29 @@ BBSR <- function(X, Y, clr.mat, nS, no.pr.val, weights.mat, cores) {
     pp[ind, clr.order[1:min(K, nS, length(clr.order))]] <- TRUE
   }
   diag(pp) <- FALSE
+  
+  # NEW: remove predictors that are constant or essentially duplicates of others
+  const <- which(apply(is.na(X), 1, sum) > 0)
+  cat('The following predictors are constant and will not be used:\n')
+  print(const)
+  pp[, const] <- FALSE
+  exp.mat <- X
+  done <- FALSE
+  while (!done) {
+    cor.mat <- cor(t(exp.mat))
+    diag(cor.mat) <- 0
+    cor.mat[is.na(cor.mat)] <- 0
+    todo <- which(apply(cor.mat > 0.99, 1, sum) > 0)
+    if (length(todo) > 0) {
+      remove <- which(cor.mat[todo[1], ] > 0.99)[1]
+      cat('Removing predictor', rownames(exp.mat)[remove], 'because it has correlation > 0.99 with', rownames(exp.mat)[todo[1]], '\n')
+      pp[, rownames(exp.mat)[todo[1]]] <- pp[, rownames(exp.mat)[todo[1]]] | pp[, rownames(exp.mat)[remove]]
+      pp[, rownames(exp.mat)[remove]] <- FALSE
+      exp.mat <- exp.mat[-remove, ]
+    } else {
+      done <- TRUE
+    }
+  }
   
   out.list <- mclapply(1:G, BBSRforOneGene, X, Y, pp, weights.mat, nS, mc.cores=cores)
   return(out.list)
@@ -378,7 +401,18 @@ PredErrRed <- function(y, x, beta) {
     pred.tmp[i] <- FALSE
     x.tmp <- matrix(x[,pred.tmp], N, P-1)
     #bhat <- solve(t(x.tmp) %*% x.tmp) %*% t(x.tmp) %*% y
-    bhat <- solve(crossprod(x.tmp), crossprod(x.tmp, y))
+    tryCatch({
+      bhat <- solve(crossprod(x.tmp), crossprod(x.tmp, y))
+    }, error = function(e) {
+      if (any(grepl('solve.default', e$call)) & grepl('singular', e$message)) {
+        # error in solve - system is computationally singular
+        cat('PredErrRed: error in solve - system is computationally singular\n')
+        browser()
+        stop(e)
+      } else {
+        stop(e)
+      }
+    })
     residuals <- y - x.tmp %*% bhat
     sigma.sq <- var(residuals)
 
