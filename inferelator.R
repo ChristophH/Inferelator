@@ -58,7 +58,7 @@ PARS$eval.on.subset <- FALSE
 PARS$method <- 'BBSR'  # 'BBSR' or 'MEN'
 PARS$prior.weight <- 1
 
-PARS$use.tfa <- TRUE
+PARS$use.tfa <- FALSE
 
 
 # some of the elastic net parameters that are essentially constants;

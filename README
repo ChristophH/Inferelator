@@ -36,6 +36,12 @@ PARS$perm.tp <- 1  # number of permutations of true priors
 PARS$perc.fp <- 0  # percent of false priors (100 = as many false priors as 
                    # there are true priors); can be vector
 PARS$perm.fp <- 1  # number of permutations of false priors
+PARS$pr.sel.mode <- 'random'  # prior selection mode: 'random' or 'tf'
+                              # if 'random', the true priors are randomly chosen
+                              # from all priors edges, if 'tf', 
+                              # PARS$perc.tp is interpreted as the percent of
+                              # TFs to use for true priors and all interactions
+                              # for the chosen TFs will be used
 
 PARS$eval.on.subset <- FALSE  # whether to evaluate only on the part of the 
                               # network that has connections in the gold
@@ -43,8 +49,13 @@ PARS$eval.on.subset <- FALSE  # whether to evaluate only on the part of the
                               # drawn from that part of the network
 
 PARS$method <- 'BBSR'  # which method to use; either 'MEN' or 'BBSR'
-PARS$prior.weight <- 1  # the weight for the priors
+PARS$prior.weight <- 1  # the weight for the priors; has to be larger than 1
+                        # for priors to have an effect
 
+PARS$use.tfa <- FALSE  # whether to estimate transcription factor activities and
+                       # use those in the regression models
+                       # if TRUE, interactions in priors file shoud be signed,
+                       # i.e. -1 for repression and +1 for activation
 
 
 --------------------------------------------------------------------------------
