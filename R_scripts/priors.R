@@ -1,5 +1,7 @@
+require('Matrix')
+
 getPriors <- function(exp.mat, tf.names, priors.mat, gs.mat, eval.on.subset, 
-                      job.seed, perc.tp, perm.tp, perc.fp, perm.fp) {
+                      job.seed, perc.tp, perm.tp, perc.fp, perm.fp, sel.mode) {
   # priors.pars is list of prior parameters; every entry is a vector of four
   # elements: perc.tp, tp permutation number, perc.fp, fp permutation number
 
@@ -38,19 +40,20 @@ getPriors <- function(exp.mat, tf.names, priors.mat, gs.mat, eval.on.subset,
   for (i in 1:length(priors.pars)) {
     pp <- priors.pars[[i]]
     
-    priors[[i]] <- matrix(0, nrow(exp.mat), length(tf.names), dimnames=dimnames(priors.mat))
+    priors[[i]] <- Matrix(0, nrow(exp.mat), length(tf.names), dimnames=dimnames(priors.mat))
     names(priors)[i] <- paste('frac_tp_', pp[1], '_perm_', pp[2], '--frac_fp_', 
                               pp[3], '_perm_', pp[4], sep="")
     
     if (pp[1] > 0 | pp[3] > 0) {
-      priors[[i]] <- getPriorMatrix(priors.mat, pp, gs.mat, eval.on.subset, job.seed)
+      priors[[i]] <- getPriorMatrix(priors.mat, pp, gs.mat, eval.on.subset, 
+                                    job.seed, sel.mode)
     }
     
   }
   return(priors)
 }
 
-getPriorMatrix <- function(priors, prior.pars, gs, from.subset, seed) {
+getPriorMatrix <- function(priors, prior.pars, gs, from.subset, seed, sel.mode) {
   # Given the gold standard, path of the input data, and a set of prior
   # parameters, this function returns a single -1, 0, 1 matrix of random 
   # priors.
@@ -61,13 +64,19 @@ getPriorMatrix <- function(priors, prior.pars, gs, from.subset, seed) {
   perm.fp <- prior.pars[4]
 
   if (!from.subset) {
-    p.mat <- makePriorMat(priors, perc.tp, perm.tp + seed) + 
-             makePriorMat(priors, perc.fp, perm.fp + seed, false.priors = TRUE)
+    if (sel.mode == 'random') {
+      p.mat <- makePriorMat(priors, perc.tp, perm.tp + seed) + 
+               makePriorMat(priors, perc.fp, perm.fp + seed, false.priors = TRUE)
+    }
+    if (sel.mode == 'tf') {
+      p.mat <- makePriorMatTF(priors, perc.tp, perm.tp + seed)
+    }
   } else {
-    p.mat <- matrix(0, nrow(priors), ncol(priors))
+    p.mat <- Matrix(0, nrow(priors), ncol(priors))
     rows  <- apply(gs,1,sum) > 0
     cols <- apply(gs,2,sum) > 0
-    p.mat[rows, cols] <- getPriorMatrix(priors[rows, cols], prior.pars, NULL, FALSE, seed)
+    p.mat[rows, cols] <- getPriorMatrix(priors[rows, cols], prior.pars, NULL, 
+                                        FALSE, seed, sel.mode)
   }
   dimnames(p.mat) <- dimnames(priors)
   return(p.mat)
@@ -92,7 +101,7 @@ makePriorMat <- function(priors, perc, perm, false.priors = FALSE) {
   set.seed(perm, "Mersenne-Twister", "Inversion")
 
   n.priors <- floor(sum(priors != 0) * perc / 100)
-  p.mat <- matrix(0, nrow(priors), ncol(priors))
+  p.mat <- Matrix(0, nrow(priors), ncol(priors))
   
   if (n.priors > 0) {
     if (false.priors) {
@@ -102,12 +111,40 @@ makePriorMat <- function(priors, perc, perm, false.priors = FALSE) {
       prior.order <- sample(which(priors != 0))
       p.mat[prior.order[1:n.priors]] <- priors[prior.order[1:n.priors]]
     }
+    
+    # The above code ignores whether perc is set too high, but we should warn
+    # the user.
+    if (n.priors > length(prior.order)) {
+      warning("Percent of priors set too high. Only the max used.", call.=TRUE)
+    }
   }
 
-  # The above code ignores whether perc is set too high, but we should warn
-  # the user.
-  if (n.priors > length(prior.order)) {
-    warning("Percent of priors set too high. Only the max used.", call.=TRUE)
+  # return RNG to old state
+  .Random.seed <<- rng.state
+  
+  return(p.mat)
+}
+
+makePriorMatTF <- function(priors, perc, perm, false.priors = FALSE) {
+  # Creates prior matrix based on:
+
+  # save the state of the RNG
+  rng.state <- .Random.seed
+
+  set.seed(perm, "Mersenne-Twister", "Inversion")
+
+  # how many TFs do we pick
+  tf.out.deg <- apply(priors != 0, 2, sum)
+  n.tfs <- floor(sum(tf.out.deg > 0) * perc / 100)
+  p.mat <- Matrix(0, nrow(priors), ncol(priors))
+  
+  if (n.tfs > 0) {
+    if (false.priors) {
+      stop('False priors not supported in all-or-nothing TF mode')
+    } else {
+      tf.order <- sample(which(tf.out.deg > 0))
+      p.mat[, tf.order[1:n.tfs]] <- priors[, tf.order[1:n.tfs]]
+    }
   }
 
   # return RNG to old state

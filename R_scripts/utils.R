@@ -24,6 +24,16 @@ trivial.meta.data <- function(cond.names) {
   return(meta.data)
 }
 
+reshape.prior <- function(priors.mat, gene.names, tf.names) {
+  bg.val <- as.numeric(names(which.max(table(priors.mat))))
+  res <- matrix(bg.val, length(gene.names), length(tf.names), 
+                dimnames=list(gene.names, tf.names))
+  p.genes <- intersect(rownames(priors.mat), gene.names)
+  p.tfs <- intersect(colnames(priors.mat), tf.names)
+  res[p.genes, p.tfs] <- priors.mat[p.genes, p.tfs]
+  return(res)
+}
+
 read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file, 
                        priors.file, gold.standard.file, leave.out.file) {
   IN <- list()
@@ -34,12 +44,16 @@ read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file,
     IN$exp.mat <- as.matrix(read.table(file=file.path(input.dir, exp.mat.file),
                             row.names=1, header=T, sep='\t', check.names=F))
   }
-  IN$tf.names <- as.vector(as.matrix(read.table(file.path(input.dir, tf.names.file))))
+  IN$tf.names <- unique(as.vector(as.matrix(read.table(file.path(input.dir, tf.names.file)))))
 
   IN$meta.data <- NULL
   if (!is.null(meta.data.file)) {
-    IN$meta.data <- read.table(file=file.path(input.dir, meta.data.file), 
-                               header=T, sep='\t')
+    if (grepl('.RData$', meta.data.file)) {
+      IN$meta.data <- local(get(load(file.path(input.dir, meta.data.file))))
+    } else {
+      IN$meta.data <- read.table(file=file.path(input.dir, meta.data.file), 
+                                 header=T, sep='\t')
+    }
   }
   
   # if there is a leave-out file, ignore some conditions
@@ -61,11 +75,13 @@ read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file,
       IN$priors.mat <- as.matrix(read.table(file=file.path(input.dir, priors.file),
                                  row.names=1, header=T, sep='\t', check.names=F))
     }
+    IN$priors.mat <- reshape.prior(IN$priors.mat, rownames(IN$exp.mat), IN$tf.names)
   }
   IN$gs.mat <- NULL
   if (!is.null(gold.standard.file)) {
     IN$gs.mat <- as.matrix(read.table(file=file.path(input.dir, gold.standard.file),
                                     row.names=1, header=T, sep='\t', check.names=F))
+    IN$gs.mat <- reshape.prior(IN$gs.mat, rownames(IN$exp.mat), IN$tf.names)
   }
   return(IN)
 }

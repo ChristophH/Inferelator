@@ -45,7 +45,7 @@ get_usr_chosen_design <- function(cM, r, delT_min, delT_max, time_delayed,
   # if we have time series experiments
   if(length(ts_idx)>0) { 
     # data for time series
-    if( any(eq_idx) ){ #simple check to see if there are any equlibrium conditions 
+    if( length(eq_idx) > 0 ){ #simple check to see if there are any equlibrium conditions 
       rTS = r[,-eq_idx]
     }else{
       rTS = r
@@ -62,7 +62,7 @@ get_usr_chosen_design <- function(cM, r, delT_min, delT_max, time_delayed,
       eq_idx_pseudo = c(eq_idx_pseudo, which(delT_vec_trivial > max(delT_max_vec)))
     
     # create design matrix for steady state
-    if( any(eq_idx) ){
+    if( length(eq_idx) > 0 ){
       DesignMatSS = cbind(rSS, rTS[,eq_idx_pseudo])
     }else{
       DesignMatSS = rTS[,eq_idx_pseudo,drop=F]
@@ -323,5 +323,137 @@ make_final_design_and_response_matrix <- function(dMSS, dMTS, rMSS, rMTS, param,
   }
     
   return (list(final_response_matrix, final_design_matrix, resp_idx))
+}
+
+
+
+################################################################################
+# CH Jun 3, 2014
+# All the functions in this file should be replaced with something sane, but
+# I don't have time for this right now.
+
+design.and.response.old <- function(meta.data, exp.mat, delT.min, delT.max, tau,
+                                clusterStack, tf.names, time_delayed=T, 
+                                all_intervals=F, use_t0_as_steady_state=F, 
+                                use_delt_bigger_than_cutoff_as_steady_state=T) {
+  # get design matrix
+  x <- get_usr_chosen_design(meta.data, exp.mat, delT.min, 
+                             delT.max, time_delayed=T, all_intervals=F, 
+                             use_t0_as_steady_state=F, 
+                             use_delt_bigger_than_cutoff_as_steady_state=T)
+  design_matrix_steady_state <- x[[1]]
+  design_matrix_time_series <- x[[2]]
+
+  # get response matrix
+  x <- get_usr_chosen_response(meta.data, exp.mat, delT.min, 
+                               delT.max, 'inf_1', tau, 
+                               use_t0_as_steady_state=F, 
+                               use_delt_bigger_than_cutoff_as_steady_state=T)
+  response_matrix_steady_state <- x[[1]]
+  response_matrix_time_series <- x[[2]]
+
+  # make final design/response matrices
+  x <- make_final_design_and_response_matrix(design_matrix_steady_state,
+                                             design_matrix_time_series,
+                                             response_matrix_steady_state,
+                                             response_matrix_time_series,
+                                             'all', clusterStack, exp.mat, 
+                                             tf.names, make.des.red.exp=T)
+  
+  return(list(final_design_matrix=x[[2]], final_response_matrix=x[[1]], resp.idx=x[[3]]))
+}
+
+
+# CH Aug 15, 2014
+# This replaces all of the above code and should be more robust.
+
+# notes
+# design matrix is same as exp.mat leaving out last time points
+# response matrix is same as design for steady state; linear interpolation else
+design.and.response <- function(meta.data, exp.mat, delT.min, delT.max, tau) {
+  
+  cond <- as.character(meta.data$condName)
+  prev <- as.character(meta.data$prevCol)
+  delt <- meta.data$del.t
+  
+  # break time series if del.t is larger than delT.max
+  prev[delt > delT.max] <- NA
+  delt[delt > delT.max] <- NA
+  
+  # fix condition names if needed (R is picky about row and column names and 
+  # might have used different condition names in expression matrix)
+  not.in.mat <- setdiff(cond, colnames(exp.mat))
+  cond.dup <- duplicated(cond)
+  if (length(not.in.mat) > 0) {
+    cond <- gsub('[/+-]', '.', cond)
+    prev <- gsub('[/+-]', '.', prev)
+    if (!all(cond.dup == duplicated(cond))) {
+      stop('Tried to fix condition names in meta data so that they would match column names in expression matrix, but failed')
+    }
+  }
+  # check if there are condition names missing in expression matrix
+  not.in.mat <- setdiff(cond, colnames(exp.mat))
+  if (length(not.in.mat) > 0) {
+    print(not.in.mat)
+    stop('Error when creating design and response. The conditions printed above are in the meta data, but not in the expression matrix')
+  }
+  
+  des.mat <- matrix(0, nrow(exp.mat), 0, dimnames=list(rownames(exp.mat), NULL))
+  res.mat <- matrix(0, nrow(exp.mat), 0, dimnames=list(rownames(exp.mat), NULL))
+  
+  # handle all the steady state conditions first
+  steady <- is.na(prev) & !(cond %in% prev)
+  for (i in which(steady)) {
+    des.mat <- cbind(des.mat, exp.mat[, cond[i]])
+    colnames(des.mat)[ncol(des.mat)] <- cond[i]
+    res.mat <- cbind(res.mat, exp.mat[, cond[i]])
+    colnames(res.mat)[ncol(res.mat)] <- cond[i]
+  }
+  
+  # handle time series
+  for (i in which(!steady)) {
+    # find the conditions that follow this one and are at least delT.min far apart
+    following <- which(prev == cond[i])
+    following.delt <- delt[following]
+    off <- which(following.delt < delT.min)
+    while (length(off) > 0) {
+      off.fol <- which(prev == cond[following[off[1]]])
+      off.fol.delt <- delt[off.fol]
+      following <- c(following[-off[1]], off.fol)
+      following.delt <- c(following.delt[-off[1]], off.fol.delt + following.delt[off[1]])
+      off <- which(following.delt < delT.min)
+    }
+    
+    # for each following condition (time point)
+    n <- length(following)
+    cntr <- 1
+    for (j in following) {
+      if (n > 1) {
+        this.cond <- sprintf('%s_dupl%02d', cond[i], cntr)
+      } else {
+        this.cond <- cond[i]
+      }
+      des.mat <- cbind(des.mat, exp.mat[, cond[i]])
+      colnames(des.mat)[ncol(des.mat)] <- this.cond
+      
+      interp.res <- tau / following.delt[cntr] * (exp.mat[, cond[j]] - exp.mat[, cond[i]]) + exp.mat[, cond[i]]
+      res.mat <- cbind(res.mat, interp.res)
+      colnames(res.mat)[ncol(res.mat)] <- this.cond
+      
+      cntr <- cntr + 1
+    }
+    
+    # special case: nothing is following this condition within delT.min
+    # and it is the first of a time series --- treat as steady state
+    if (n == 0 & !(cond[i] %in% prev)) {
+      des.mat <- cbind(des.mat, exp.mat[, cond[i]])
+      colnames(des.mat)[ncol(des.mat)] <- cond[i]
+      res.mat <- cbind(res.mat, exp.mat[, cond[i]])
+      colnames(res.mat)[ncol(res.mat)] <- cond[i]
+    }
+    
+  }
+  resp.idx <- t(matrix(1:ncol(res.mat), ncol(res.mat), nrow(exp.mat)))
+  return(list(final_design_matrix=des.mat, final_response_matrix=res.mat, resp.idx=resp.idx))
 }
 

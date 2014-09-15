@@ -3,7 +3,7 @@ require('nnls')
 
 # fix prior known interactions so the pseudoinverse does not fail
 fix.pki <- function(pki) {
-  diag(pki)[apply(pki, 2, sum) == 0] <- 1
+  diag(pki)[apply(pki != 0, 2, sum) == 0] <- 1
   # check for identical columns in pki
   m <- ncol(pki)
   fix.me <- T
@@ -14,7 +14,7 @@ fix.pki <- function(pki) {
         if(all(pki[, i] == pki[, j]) == TRUE) {
           pki[i, i] <- 1
           pki[j, j] <- 1
-          #cat('Identical columns in rf (', i, j, ') fixed via self-interactions.\n')
+          cat('Identical columns in rf (', i, j, ') fixed via self-interactions.\n')
           fix.me <- T
         }
       }
@@ -38,8 +38,8 @@ tfa <- function(prior, res.mat, des.mat, cores) {
   #prior.fixed <- t(t(prior.fixed) / abs.col.avg)
   
   prior.inv <- pseudoinverse(prior.fixed)
-  activities <- prior.inv %*% res.mat
-  dimnames(activities) <- list(colnames(prior), colnames(res.mat))
+  activities <- prior.inv %*% des.mat
+  dimnames(activities) <- list(colnames(prior), colnames(des.mat))
   
   #i <- 2
   #j <- 1
@@ -48,6 +48,52 @@ tfa <- function(prior, res.mat, des.mat, cores) {
   #Ex <- sum(Ac * Pg)
   #Ex.ob <- res.mat[i,j]
   #browser()
+  return(activities)
+}
+
+tfa.noself <- function(prior, res.mat, des.mat, cores) {
+  diag(prior) <- 0
+  activities <- matrix(0, ncol(prior), ncol(res.mat), 
+                     dimnames=list(colnames(prior), colnames(res.mat)))
+
+  has.prior <- names(which(apply(prior != 0, 2, sum) > 0))
+  has.no.prior <- names(which(apply(prior != 0, 2, sum) == 0))
+
+  activities[has.prior, ] <- pseudoinverse(prior[, has.prior]) %*% res.mat
+  activities[has.no.prior, ] <- prior[has.no.prior, has.prior] %*% activities[has.prior, ]
+
+  has.no.act <- names(which(apply(activities, 1, function(x) length(unique(x)) == 1)))
+  activities[has.no.act, ] <- res.mat[has.no.act, ]
+  return(activities)
+}
+
+tfa.noself2 <- function(prior, exp.mat) {
+  diag(prior) <- 0
+  #prior.fixed <- fix.pki(prior)
+  
+  activities <- pseudoinverse(prior) %*% exp.mat
+  dimnames(activities) <- list(colnames(prior), colnames(exp.mat))
+  
+  has.no.act <- names(which(apply(prior != 0, 2, sum) == 0))
+  #has.no.act <- names(which(apply(activities, 1, function(x) length(unique(x)) == 1)))
+  
+  activities[has.no.act, ] <- exp.mat[has.no.act, ]
+  
+  return(activities)
+}
+
+tfa.noself3 <- function(prior, exp.mat, exp.mat.halftau) {
+  diag(prior) <- 0
+  #prior.fixed <- fix.pki(prior)
+  
+  activities <- pseudoinverse(prior) %*% exp.mat.halftau
+  dimnames(activities) <- list(colnames(prior), colnames(exp.mat.halftau))
+  
+  has.no.act <- names(which(apply(prior != 0, 2, sum) == 0))
+  #has.no.act <- names(which(apply(activities, 1, function(x) length(unique(x)) == 1)))
+  
+  activities[has.no.act, ] <- exp.mat[has.no.act, ]
+  
   return(activities)
 }
 
@@ -65,20 +111,20 @@ tfa.bs <- function(prior, res.mat, des.mat) {
   return(ret)
 }
 
-tfa.nn <- function(prior, res.mat, des.mat) {
+tfa.nn <- function(prior, res.mat, des.mat, cores) {
   diag(prior) <- 0
   #cor.mat <- cor(t(res.mat), t(res.mat[colnames(prior), ]))
   #prior <- prior * sign(cor.mat)
   #prior.fixed <- fix.pki(prior)
   
-  dn <- dimnames(prior)
-  prior <- refit.betas.mc(des.mat[colnames(prior), ], res.mat, prior)[, -1]
-  dimnames(prior) <- dn
+  #dn <- dimnames(prior)
+  #prior <- refit.betas.mc(des.mat[colnames(prior), ], res.mat, prior)[, -1]
+  #dimnames(prior) <- dn
   prior.fixed <- fix.pki(prior)
   
-  abs.col.avg <- apply(abs(prior.fixed), 2, sum) / apply(prior.fixed != 0, 2, sum)
+  #abs.col.avg <- apply(abs(prior.fixed), 2, sum) / apply(prior.fixed != 0, 2, sum)
   #abs.col.avg <- apply(prior.fixed, 2, sum) / apply(prior.fixed != 0, 2, sum)
-  prior.fixed <- t(t(prior.fixed) / abs.col.avg)
+  #prior.fixed <- t(t(prior.fixed) / abs.col.avg)
   
   des.mat <- matrix(0, ncol(prior), ncol(res.mat), dimnames=list(colnames(prior), colnames(res.mat)))
   for (i in 1:ncol(res.mat)) {
