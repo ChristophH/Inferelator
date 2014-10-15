@@ -81,7 +81,8 @@ if (length(args) == 1) {
   #job.cfg <- '/home/ch1421/Projects/Rice/inferelator_jobs/ALL_htseq_intersection-strict_noprior.R'
   #job.cfg <- 'jobs/bsubtilis_eu_201310_stfa_bbsr_tf_11_tp50_fp0.R'
   #job.cfg <- 'jobs/bsubtilis_us_201310_stfa_bbsr_11_tp100_fp0.R'
-  job.cfg <- 'jobs/bsubtilis_us_test.R'
+  job.cfg <- 'jobs/bsubtilis_201408_us_noKO_weight_110_tp_100_fp_000.R'
+  #job.cfg <- 'jobs/bsubtilis_us_test.R'
 }
 
 # load job specific parameters from input config file

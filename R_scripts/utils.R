@@ -31,6 +31,9 @@ reshape.prior <- function(priors.mat, gene.names, tf.names) {
   p.genes <- intersect(rownames(priors.mat), gene.names)
   p.tfs <- intersect(colnames(priors.mat), tf.names)
   res[p.genes, p.tfs] <- priors.mat[p.genes, p.tfs]
+  #for (tf in colnames(res)) {
+  #  res[tf, tf] <- bg.val
+  #}
   return(res)
 }
 
@@ -52,7 +55,7 @@ read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file,
       IN$meta.data <- local(get(load(file.path(input.dir, meta.data.file))))
     } else {
       IN$meta.data <- read.table(file=file.path(input.dir, meta.data.file), 
-                                 header=T, sep='\t')
+                                 header=T, sep='\t', check.names=F)
     }
   }
   
@@ -60,11 +63,11 @@ read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file,
   if (!is.null(leave.out.file)) {
     leave.out <- as.vector(as.matrix(read.table(file.path(input.dir, leave.out.file))))
     cat('Leaving out the following conditions:', leave.out, '\n')
-    lo <- colnames(IN$exp.mat) %in% leave.out
-    IN$exp.mat.lo <- as.matrix(IN$exp.mat[, lo])
+    lo <- (IN$meta.data$prevCol %in% leave.out) | (IN$meta.data$condName %in% leave.out)
     IN$meta.data.lo <- IN$meta.data[lo, ]
-    IN$exp.mat <- as.matrix(IN$exp.mat[, !lo])
     IN$meta.data <- IN$meta.data[!lo, ]
+    IN$exp.mat.lo <- IN$exp.mat[, as.character(IN$meta.data.lo$condName)]
+    IN$exp.mat <- IN$exp.mat[, as.character(IN$meta.data$condName)]
   }
   
   IN$priors.mat <- NULL
@@ -85,3 +88,4 @@ read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file,
   }
   return(IN)
 }
+
