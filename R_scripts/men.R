@@ -14,17 +14,11 @@ callMEN <- function(ind, Xs, Y, clr.mat, nS,
   
   #since we do cross-validation, we
   #need to get only the unique condtions
-  #uniqConds <- Pi
-  #uniqConds <- uniqConds[!duplicated(uniqConds) & uniqConds != 0 & !is.na(uniqConds)]
+  keep <- (1:ncol(Y))[!duplicated(colnames(Y))]
   
-  #Y     <- t(scale(t(Y[, Pi[ind, uniqConds]])))
-  Y      <- unique(Y, MARGIN=2)
-  #Y     <- Y[, Pi[ind, uniqConds]]
-  Y_ind <- Y[ind, ]
+  Y_ind <- Y[ind, keep]
   
-  #Xs <- t(scale(t(Xs[, Pi[ind, uniqConds]])))#
-  Xs <- unique(Xs, MARGIN=2)
-  #Xs <- Xs[, Pi[ind, uniqConds]]
+  Xs <- Xs[, keep]
   
   #setting which predictors we consider
   
@@ -277,7 +271,7 @@ cvAdaptiveEnet <- function(x, y, k.folds = 10, lambda.vec = c(0),
       
           weights.vec <- in.weights.vec
       }
-    
+      
       fit <- enetWeights(x.train, y.train, trace = trace, lambda=lambda,in.weights=weights.vec)
       fit <- predict(fit, x.test, mode = "fraction", s = s.fraction)$fit
     
