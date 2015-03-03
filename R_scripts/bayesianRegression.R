@@ -3,7 +3,7 @@
 # Author: Christoph
 ###############################################################################
 
-BBSR <- function(X, Y, clr.mat, nS, no.pr.val, weights.mat, cores) {
+BBSR <- function(X, Y, clr.mat, nS, no.pr.val, weights.mat, prior.mat, cores) {
   
   # Scale and permute design and response matrix
   X <- t(scale(t(X)))
@@ -16,6 +16,7 @@ BBSR <- function(X, Y, clr.mat, nS, no.pr.val, weights.mat, cores) {
   
   # keep all predictors that we have priors for
   pp[(weights.mat != no.pr.val) & !is.na(clr.mat)] <- TRUE
+  pp[(prior.mat != 0) & !is.na(clr.mat)] <- TRUE
   
   # for each gene, add the top nS predictors of the list to possible predictors
   clr.mat[clr.mat == 0] <- NA

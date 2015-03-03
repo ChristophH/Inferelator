@@ -214,9 +214,7 @@ for (prior.name in names(IN$priors)) {
   
   # estimate transcription factor activities
   if(PARS$use.tfa) {
-    #IN$tf.activities[[prior.name]] <- tfa(prior, IN$final_response_matrix, IN$final_design_matrix, PARS$cores)
-    #IN$tf.activities[[prior.name]] <- tfa.noself2(prior, IN$final_design_matrix)
-    IN$tf.activities[[prior.name]] <- tfa.noself3(prior, IN$final_design_matrix, IN$final_response_matrix_halftau)
+    IN$tf.activities[[prior.name]] <- tfa(prior, IN$final_design_matrix, IN$final_response_matrix_halftau)
   }
     
   # set the prior weights matrix
@@ -284,7 +282,7 @@ for (prior.name in names(IN$priors)) {
     cat('Calculating sparse ODE models\n')
     if (PARS$method == 'BBSR') {
       x <- BBSR(X, Y, clr.mat, PARS$max.preds, no.pr.weight, weights.mat, 
-                PARS$cores)
+                prior, PARS$cores)
     }
     if (PARS$method == 'MEN' ) {
       x <- mclapply(1:nrow(Y), callMEN, Xs=X, Y=Y, 

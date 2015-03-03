@@ -82,8 +82,12 @@ read.input <- function(input.dir, exp.mat.file, tf.names.file, meta.data.file,
   }
   IN$gs.mat <- NULL
   if (!is.null(gold.standard.file)) {
-    IN$gs.mat <- as.matrix(read.table(file=file.path(input.dir, gold.standard.file),
+    if (grepl('.RData$', gold.standard.file)) {
+      IN$gs.mat <- local(get(load(file.path(input.dir, gold.standard.file))))
+    } else {
+      IN$gs.mat <- as.matrix(read.table(file=file.path(input.dir, gold.standard.file),
                                     row.names=1, header=T, sep='\t', check.names=F))
+    }
     IN$gs.mat <- reshape.prior(IN$gs.mat, rownames(IN$exp.mat), IN$tf.names)
   }
   return(IN)

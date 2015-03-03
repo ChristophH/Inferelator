@@ -23,79 +23,24 @@ fix.pki <- function(pki) {
   return(pki)
 }
 
-tfa <- function(prior, res.mat, des.mat, cores) {
-  diag(prior) <- 0
-  #cor.mat <- cor(t(res.mat), t(des.mat[colnames(prior), ]))
-  #prior <- prior * sign(cor.mat)
-  
-  #dn <- dimnames(prior)
-  #betas <- refit.betas.mc(des.mat[colnames(prior), ], res.mat, prior, cores)
-  #prior <- betas[, -1]
-  #dimnames(prior) <- dn
-  prior.fixed <- fix.pki(prior)
-  
-  #abs.col.avg <- apply(abs(prior.fixed), 2, sum) / apply(prior.fixed != 0, 2, sum)
-  #prior.fixed <- t(t(prior.fixed) / abs.col.avg)
-  
-  prior.inv <- pseudoinverse(prior.fixed)
-  activities <- prior.inv %*% des.mat
-  dimnames(activities) <- list(colnames(prior), colnames(des.mat))
-  
-  #i <- 2
-  #j <- 1
-  #Ac <- activities[, j]
-  #Pg <- prior.fixed[i, ]
-  #Ex <- sum(Ac * Pg)
-  #Ex.ob <- res.mat[i,j]
-  #browser()
-  return(activities)
-}
 
-tfa.noself <- function(prior, res.mat, des.mat, cores) {
-  diag(prior) <- 0
-  activities <- matrix(0, ncol(prior), ncol(res.mat), 
-                     dimnames=list(colnames(prior), colnames(res.mat)))
 
-  has.prior <- names(which(apply(prior != 0, 2, sum) > 0))
-  has.no.prior <- names(which(apply(prior != 0, 2, sum) == 0))
-
-  activities[has.prior, ] <- pseudoinverse(prior[, has.prior]) %*% res.mat
-  activities[has.no.prior, ] <- prior[has.no.prior, has.prior] %*% activities[has.prior, ]
-
-  has.no.act <- names(which(apply(activities, 1, function(x) length(unique(x)) == 1)))
-  activities[has.no.act, ] <- res.mat[has.no.act, ]
-  return(activities)
-}
-
-tfa.noself2 <- function(prior, exp.mat) {
-  diag(prior) <- 0
-  #prior.fixed <- fix.pki(prior)
-  
-  activities <- pseudoinverse(prior) %*% exp.mat
-  dimnames(activities) <- list(colnames(prior), colnames(exp.mat))
-  
-  has.no.act <- names(which(apply(prior != 0, 2, sum) == 0))
-  #has.no.act <- names(which(apply(activities, 1, function(x) length(unique(x)) == 1)))
-  
-  activities[has.no.act, ] <- exp.mat[has.no.act, ]
-  
-  return(activities)
-}
-
-tfa.noself3 <- function(prior, exp.mat, exp.mat.halftau) {
-  diag(prior) <- 0
-  #prior.fixed <- fix.pki(prior)
+tfa <- function(prior, exp.mat, exp.mat.halftau, noself=TRUE) {
+  tfs <- colnames(prior)
+  if (noself) {
+    diag(prior[tfs, tfs]) <- 0
+  }
   
   activities <- pseudoinverse(prior) %*% exp.mat.halftau
   dimnames(activities) <- list(colnames(prior), colnames(exp.mat.halftau))
   
   has.no.act <- names(which(apply(prior != 0, 2, sum) == 0))
-  #has.no.act <- names(which(apply(activities, 1, function(x) length(unique(x)) == 1)))
   
   activities[has.no.act, ] <- exp.mat[has.no.act, ]
   
   return(activities)
 }
+
 
 tfa.bs <- function(prior, res.mat, des.mat) {
   K <- 50
