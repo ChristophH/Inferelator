@@ -1,0 +1,240 @@
+
+# This is a network report generated on `r format(Sys.time(), "%Y-%m-%d %H-%M-%S")`
+# by `r Sys.info()['login']` with `r version$version.string`
+# on a `r version$platform` platform.
+
+This report is based on the file `r basename(cc.file)` in directory **`r dirname(cc.file)`**.
+
+
+
+```{r, include=FALSE}
+library('Matrix')
+
+in.dir <- dirname(cc.file)
+
+load(cc.file)
+load(gsub('combinedconf', 'betas', cc.file))
+load(paste(in.dir, 'params_and_input.RData', sep='/'))
+
+if (is.null(colnames(comb.confs))) {
+  colnames(comb.confs) <- IN$tf.names
+  rownames(comb.confs) <- rownames(IN$exp.mat)
+}
+
+beta.sign <- as.matrix(betas[[1]] * 0)
+for (n in 1:length(betas)) {
+  beta.sign <- beta.sign + sign(betas[[n]])
+}
+dimnames(beta.sign) <- dimnames(comb.confs)
+
+# match the ccfile to the prior that was used
+  p.ind <- which(sapply(names(IN$priors), function(n) grepl(n, cc.file)))
+  p.name <- names(IN$priors)[p.ind]
+  p.mat <- IN$grouped.pred[[p.name]]$prior.mat[rownames(beta.sign), colnames(beta.sign)]
+
+# get median rescaled beta
+resc.betas <- lapply(betas.resc, function(x) x[beta.sign != 0])
+resc.betas <- matrix(unlist(resc.betas), length(resc.betas[[1]]))
+resc.betas.median <- apply(resc.betas, 1, median)
+
+# create data frame of non-zero scores 
+non.zero <- which(beta.sign != 0, arr.ind=TRUE)
+vec.ind <- which(beta.sign != 0)
+net.df <- data.frame(regulator=colnames(beta.sign)[non.zero[, 2]], 
+                     target=rownames(beta.sign)[non.zero[, 1]], 
+                     beta.sign=beta.sign[vec.ind], 
+                     var.exp.median=resc.betas.median,
+                     prior=p.mat[vec.ind],
+                     vec.ind=vec.ind)
+                     
+var.exp <- as.matrix(betas.resc[[1]] * 0)
+var.exp[net.df$vec.ind] <- net.df$var.exp.median
+                     
+VAR.EXP.TH <- 0.2
+BETA.SIGN.TH <- 0.75 * PARS$num.boots
+
+
+net.stats <- function(prior.mat) {
+  cat('prior.mat.stats\n')
+  cat('non-zero entries:\t')
+  edges <- sum(prior.mat != 0)
+  cat(edges, '\n')
+  cat('TFs with targets:\t')
+  tfs <- sum(apply(prior.mat != 0, 2, sum) > 0)
+  cat(tfs, '\n')
+  cat('genes with regulators:\t')
+  targets <- sum(apply(prior.mat != 0, 1, sum) > 0)
+  cat(targets, '\n')
+  cat('average out degree:\t', edges / tfs, '\n')
+  cat('average in degree:\t', edges / targets, '\n')
+}
+```
+
+Time used for this network inference run (in hours): 
+```{r, echo=FALSE}
+print(round(PROCTIME/3600, 2))
+```
+
+# Inferred net based on beta sign threshold
+
+Table of the sign of interactions added across all `r PARS$num.boots` bootstraps.
+```{r}
+bsv <- as.vector(beta.sign)
+
+table(bsv)
+plot(table(bsv[abs(bsv) >= BETA.SIGN.TH]))
+
+# total nuber of interactions
+sum(abs(bsv) >= BETA.SIGN.TH)
+
+# table of out-degree and counts
+out.tab <- table(subset(net.df, abs(beta.sign) >= BETA.SIGN.TH)$regulator)
+table(out.tab)
+# show how many regulators (TFs) have targets
+table(out.tab > 0)
+
+# print the regulators with the most targets
+head(sort(out.tab, decreasing=TRUE))
+
+# table of in-degree and counts
+in.tab <- table(subset(net.df, abs(beta.sign) >= BETA.SIGN.TH)$target)
+table(in.tab)
+# show how many targets have at least one regulator
+table(in.tab > 0)
+
+# print the targets with most regulators
+head(sort(in.tab, decreasing=TRUE))
+
+# dimensionality of input expression
+dim(IN$exp.mat)
+```
+
+
+# Inferred net based on explained variance threshold
+```{r}
+# how does the median explained variance compare to the beta sign
+require('ggplot2')
+g <- ggplot(net.df, aes(x=factor(beta.sign), y=var.exp.median)) + geom_boxplot() + geom_hline(yintercept=VAR.EXP.TH, color='red')
+plot(g)
+
+ia.order <- order(net.df$var.exp.median, decreasing=TRUE)
+tmp <- subset(net.df[ia.order, ], var.exp.median >= 0.1)
+plot(tmp$var.exp.median, 1:nrow(tmp), 'l', xlab='variance explained threshold', ylab='number of interactions in network')
+abline(v=VAR.EXP.TH, col='red')
+
+vev <- as.vector(net.df$var.exp.median)
+table(cut(vev, 20))
+
+vev.b <- cut(vev, 20)
+.pardefault <- par(no.readonly = T)
+par(mar=c(8,4,2,1))
+plot(as.vector(table(vev.b, exclude=levels(vev.b)[1])), pch=19, xaxt='n', xlab='', ylab='counts', main='explained variance')
+axis(1, at=1:(length(levels(vev.b))-1), labels=levels(vev.b)[-1], las=2)
+par(.pardefault)
+
+
+
+# total nuber of interactions
+sum(vev >= VAR.EXP.TH)
+
+# table of out-degree and counts
+out.tab <- table(subset(net.df, var.exp.median >= VAR.EXP.TH)$regulator)
+table(out.tab)
+# show how many regulators (TFs) have targets
+table(out.tab > 0)
+
+# print the regulators with the most targets
+head(sort(out.tab, decreasing=TRUE))
+
+# table of in-degree and counts
+in.tab <- table(subset(net.df, var.exp.median >= VAR.EXP.TH)$target)
+table(in.tab)
+# show how many targets have at least one regulator
+table(in.tab > 0)
+
+# print the targets with most regulators
+head(sort(in.tab, decreasing=TRUE))
+
+
+```
+
+# Re: grouped predictors
+In this inference run, `r length(IN$priors)` sets of priors were used.
+These are the names:
+```{r, echo=FALSE}
+names(IN$priors)
+```
+These are the details regarding the grouping of predictors given the prior `r p.name`.
+```{r, echo=FALSE}
+gp <- IN$grouped.pred[[p.name]]
+```
+A total of `r length(gp$pred.has.na)` predictors contained NA and were removed.
+A total of `r length(gp$pred.is.const)` predictors were constant and were removed.
+A total of `r length(unique(unlist(gp$pred.groups)))` predictors formed `r length(gp$pred.groups)` groups.
+These are the groups and the members:
+```{r, echo=FALSE}
+gp$pred.groups
+```
+
+# Re: prior
+These are details rearding the prior with the name `r names(IN$priors)[1]` after grouping predictors.
+```{r}
+table(p.mat)
+dim(p.mat)
+
+# table of out-degree and counts
+out.vec <- apply(p.mat != 0, 2, sum)
+table(out.vec)
+# show how many regulators (TFs) have targets
+table(out.vec > 0)
+
+# print the regulators with the most targets
+mt <- order(out.vec, decreasing=TRUE)[1:5]
+data.frame(colnames(p.mat)[mt], out.vec[mt])
+
+# table of in-degree and counts
+in.vec <- apply(p.mat != 0, 1, sum)
+table(in.vec)
+# show how many targets have regulators
+table(in.vec > 0)
+
+# print the targets with the most regulators
+mt <- order(in.vec, decreasing=TRUE)[1:5]
+data.frame(rownames(p.mat)[mt], in.vec[mt])
+
+# print some network statisctics
+net.stats(p.mat)
+
+# overlap of prior and final network (beta sign)
+# only use TFs and targets in the prior
+rows <- in.vec > 0
+cols <- out.vec > 0
+
+overlap.tab <- table(as.vector(abs(beta.sign)[rows, cols] >= BETA.SIGN.TH), as.vector(p.mat[rows, cols] != 0))
+overlap.tab
+fisher.test(overlap.tab, alternative='greater')
+# consider sign of interactions
+table(as.vector(abs(beta.sign)[rows, cols] >= BETA.SIGN.TH) * sign(as.vector(beta.sign[rows, cols])), as.vector(sign(p.mat[rows, cols])))
+
+# overlap of prior and final network (explained variance)
+overlap.tab <- table(as.vector(var.exp[rows, cols]) >= VAR.EXP.TH, as.vector(p.mat[rows, cols] != 0))
+overlap.tab
+fisher.test(overlap.tab, alternative='greater')
+
+```
+
+
+# Re: AUPR
+
+```{r}
+source('/home/ch1421/Projects/Inferelator/R_scripts/evaluate.R')
+cc.aupr <- aupr(comb.confs, p.mat, eval.on.subset=TRUE)
+cat('AUPR is', cc.aupr, '\n')
+
+```
+
+
+
+
+
+
