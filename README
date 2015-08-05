@@ -16,6 +16,8 @@ PARS$tf.names.file <- 'tf_names.tsv'  # required; see definition below
 PARS$meta.data.file <- 'meta_data.tsv'  # assume all steady state if NULL
 PARS$priors.file <- 'gold_standard.tsv'  # no priors if NULL
 PARS$gold.standard.file <- 'gold_standard.tsv'  # no evaluation if NULL
+PARS$leave.out.file <- NULL  # file with list of conditions that will be ignored
+PARS$randomize.expression <- FALSE  # whether to scramble input expression
 
 PARS$job.seed <- 42  # random seed; can be NULL
 PARS$save.to.dir <- file.path(PARS$input.dir, date.time.str)  # output directory
@@ -56,7 +58,15 @@ PARS$use.tfa <- FALSE  # whether to estimate transcription factor activities and
                        # use those in the regression models
                        # if TRUE, interactions in priors file shoud be signed,
                        # i.e. -1 for repression and +1 for activation
+PARS$prior.ss <- FALSE # whether to also sub-sample from the prior matrix during
+                       # each bootstrap; if TRUE, priors are sampled randomly with 
+                       # replacement; if FALSE, all priors are used as is
 
+PARS$output.summary <- TRUE  # write a summary tsv and RData file of network
+
+PARS$output.report <- TRUE  # create html network report
+
+PARS$output.tf.plots <- TRUE  # create png files with plots of TFs and targets
 
 --------------------------------------------------------------------------------
 Required Input Files

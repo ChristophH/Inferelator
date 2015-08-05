@@ -1,5 +1,9 @@
-require("multicore")
-require("inline")
+library("inline")
+if ('parallel' %in% installed.packages()[, 'Package']) {
+  library('parallel')
+} else {
+  library('multicore')
+}
 
 discretize <- function(X, nbins) {
   N <- length(X)

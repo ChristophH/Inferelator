@@ -1,5 +1,3 @@
-require(Matrix)
-
 ChristophsPR <- function(ord.idx, gs) {
   prec <- cumsum(gs[ord.idx]) / cumsum(rep(1, length(ord.idx)))
   rec <- cumsum(gs[ord.idx]) / sum(gs)
@@ -20,17 +18,18 @@ ChristophsAUC <- function(x, y) {
 
 
 aupr <- function(mat, gs, eval.on.subset=FALSE) {
-  rows <- rep(TRUE, nrow(gs))
-  cols <- rep(TRUE, ncol(gs))
+  rows <- rownames(gs)
+  cols <- colnames(gs)
   if (eval.on.subset) {
-    rows <- apply(gs, 1, sum) > 0
-    cols <- apply(gs, 2, sum) > 0
+    rows <- rownames(gs)[apply(gs != 0, 1, sum) > 0]
+    cols <- colnames(gs)[apply(gs != 0, 2, sum) > 0]
   }
-  return(ChristophsPR(order(mat[rows, cols], decreasing=TRUE), gs[rows, cols])$auc)
+  return(ChristophsPR(order(mat[rows, cols], decreasing=TRUE), gs[rows, cols] != 0)$auc)
 }
 
 
 summarizeResults <- function(full.dir, eval.on.subset) {
+  require('Matrix')
   params.and.input <- paste(full.dir, 'params_and_input.RData', sep='/')
   if (!file.exists(params.and.input)) {
     cat('No params_and_input.RData - skipping', full.dir, '\n')

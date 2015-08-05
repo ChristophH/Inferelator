@@ -1,5 +1,3 @@
-require('elasticnet')
-
 callMEN <- function(ind, Xs, Y, clr.mat, nS, 
                     nCv = 10,lambda = 0, 
                     sparseModels=T, 	
@@ -9,6 +7,8 @@ callMEN <- function(ind, Xs, Y, clr.mat, nS,
                     weights.mat=weights.mat,
                     no.pr.val = no.pr.val, 
                     use_interactions = FALSE){
+
+  require('elasticnet')
   
   in.weights = weights.mat[ind, ]
   

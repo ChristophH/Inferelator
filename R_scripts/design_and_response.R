@@ -371,7 +371,7 @@ design.and.response.old <- function(meta.data, exp.mat, delT.min, delT.max, tau,
 # design matrix is same as exp.mat leaving out last time points
 # response matrix is same as design for steady state; linear interpolation else
 design.and.response <- function(meta.data, exp.mat, delT.min, delT.max, tau) {
-  
+
   cond <- as.character(meta.data$condName)
   prev <- as.character(meta.data$prevCol)
   delt <- meta.data$del.t
@@ -403,12 +403,8 @@ design.and.response <- function(meta.data, exp.mat, delT.min, delT.max, tau) {
   
   # handle all the steady state conditions first
   steady <- is.na(prev) & !(cond %in% prev)
-  for (i in which(steady)) {
-    des.mat <- cbind(des.mat, exp.mat[, cond[i]])
-    colnames(des.mat)[ncol(des.mat)] <- cond[i]
-    res.mat <- cbind(res.mat, exp.mat[, cond[i]])
-    colnames(res.mat)[ncol(res.mat)] <- cond[i]
-  }
+  des.mat <- cbind(des.mat, exp.mat[, cond[steady]])
+  res.mat <- cbind(res.mat, exp.mat[, cond[steady]])
   
   # handle time series
   for (i in which(!steady)) {

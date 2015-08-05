@@ -1,5 +1,3 @@
-require('corpcor')
-require('nnls')
 
 # fix prior known interactions so the pseudoinverse does not fail
 fix.pki <- function(pki) {
@@ -24,19 +22,37 @@ fix.pki <- function(pki) {
 }
 
 
+# if noself is TRUE, all self-regulatory interactions are removed
+# however, if dup.self is TRUE, self interactions for TFs that other TFs with the 
+# exact same set of interactions in the prior are kept
+# the motivation for dup.self=TRUE is that TFs with identical prior should have 
+# identical TFA
+tfa <- function(prior, exp.mat, exp.mat.halftau, noself=TRUE, dup.self=TRUE) {
+  tfwt <- apply(prior != 0, 2, sum) > 0
 
-tfa <- function(prior, exp.mat, exp.mat.halftau, noself=TRUE) {
-  tfs <- colnames(prior)
+  duplicates <- c()
+  if (dup.self) {
+    duplicates <- duplicated(prior[, tfwt], MARGIN=2) |
+                  duplicated(prior[, tfwt], MARGIN=2, fromLast = TRUE)
+    duplicates <- colnames(prior)[tfwt][duplicates]
+  }
+
+  tfs <- setdiff(colnames(prior), duplicates)
+  tfs <- intersect(tfs, rownames(prior))
   if (noself) {
     diag(prior[tfs, tfs]) <- 0
   }
+
+  activities <- matrix(0, ncol(prior), ncol(exp.mat.halftau), 
+    dimnames=list(colnames(prior), colnames(exp.mat.halftau)))
   
-  activities <- pseudoinverse(prior) %*% exp.mat.halftau
-  dimnames(activities) <- list(colnames(prior), colnames(exp.mat.halftau))
+  if (any(tfwt)) {
+    require('corpcor')
+    activities[tfwt, ] <- pseudoinverse(prior[, tfwt, drop=FALSE]) %*% exp.mat.halftau
+  }
   
-  has.no.act <- names(which(apply(prior != 0, 2, sum) == 0))
-  
-  activities[has.no.act, ] <- exp.mat[has.no.act, ]
+  use.exp <- intersect(colnames(prior)[!tfwt], rownames(exp.mat))
+  activities[use.exp, ] <- exp.mat[use.exp, ]
   
   return(activities)
 }
@@ -57,6 +73,7 @@ tfa.bs <- function(prior, res.mat, des.mat) {
 }
 
 tfa.nn <- function(prior, res.mat, des.mat, cores) {
+  require('nnls')
   diag(prior) <- 0
   #cor.mat <- cor(t(res.mat), t(res.mat[colnames(prior), ]))
   #prior <- prior * sign(cor.mat)
@@ -78,6 +95,29 @@ tfa.nn <- function(prior, res.mat, des.mat, cores) {
   return(des.mat)
 }
 
+collapse.activities <- function(activities, prior) {
+  tfs <- colnames(prior)
+  prior.noself <- prior
+  diag(prior.noself[tfs, tfs]) <- 0
+  noself.targets <- apply(prior.noself != 0, 2, sum)
+  
+  dup <- which(duplicated(t(prior)) & apply(prior != 0, 2, sum) > 0)
+  while (length(dup) > 0) {
+    dup.cols <- which(apply(prior, 2, function(x) all(x==prior[, dup[1]])))
+    exemplar <- dup.cols[order(noself.targets[dup.cols], decreasing=TRUE)[1]]
+    print('collapse activities')
+    print(dup)
+    print(dup.cols)
+    print(exemplar)
+    for (dup.col in dup.cols) {
+      #activities[dup.cols, ] <- apply(activities[dup.cols, ], 2, mean)
+      activities[dup.col, ] <- activities[exemplar, ]
+    }
+    dup <- setdiff(dup, dup.cols)
+  }
+  return(activities)
+}
+
 # given a design and response matrix, refit the betas
 # useful if we don't know whether the old betas came from scaled design and 
 # response matrices
@@ -97,3 +137,4 @@ refit.one <- function(i, X, Y, betas.old) {
   beta[selected] <- coefs
   return(beta)
 }
+

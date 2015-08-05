@@ -1,7 +1,13 @@
-require('Matrix')
+library('Matrix')
 
 getPriors <- function(exp.mat, tf.names, priors.mat, gs.mat, eval.on.subset, 
                       job.seed, perc.tp, perm.tp, perc.fp, perm.fp, sel.mode) {
+  # if no priors.mat matrix is given, generate an empty one
+  if (is.null(priors.mat)) {
+    priors.mat <- Matrix(0, nrow(exp.mat), length(tf.names), 
+      dimnames=list(rownames(exp.mat), tf.names))
+  }
+  
   # priors.pars is list of prior parameters; every entry is a vector of four
   # elements: perc.tp, tp permutation number, perc.fp, fp permutation number
 
@@ -40,11 +46,14 @@ getPriors <- function(exp.mat, tf.names, priors.mat, gs.mat, eval.on.subset,
   for (i in 1:length(priors.pars)) {
     pp <- priors.pars[[i]]
     
-    priors[[i]] <- Matrix(0, nrow(exp.mat), length(tf.names), dimnames=dimnames(priors.mat))
+    priors[[i]] <- Matrix(0, nrow(priors.mat), ncol(priors.mat), dimnames=dimnames(priors.mat))
     names(priors)[i] <- paste('frac_tp_', pp[1], '_perm_', pp[2], '--frac_fp_', 
                               pp[3], '_perm_', pp[4], sep="")
     
-    if (pp[1] > 0 | pp[3] > 0) {
+    if (pp[1] == 100 & pp[3] == 0) {
+      priors[[i]] <- priors.mat
+    }
+    else if (pp[1] > 0 | pp[3] > 0) {
       priors[[i]] <- getPriorMatrix(priors.mat, pp, gs.mat, eval.on.subset, 
                                     job.seed, sel.mode)
     }
@@ -73,8 +82,8 @@ getPriorMatrix <- function(priors, prior.pars, gs, from.subset, seed, sel.mode) 
     }
   } else {
     p.mat <- Matrix(0, nrow(priors), ncol(priors))
-    rows  <- apply(gs,1,sum) > 0
-    cols <- apply(gs,2,sum) > 0
+    rows  <- apply(gs != 0, 1, sum) > 0
+    cols <- apply(gs != 0, 2, sum) > 0
     p.mat[rows, cols] <- getPriorMatrix(priors[rows, cols], prior.pars, NULL, 
                                         FALSE, seed, sel.mode)
   }

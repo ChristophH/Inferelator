@@ -10,9 +10,15 @@ BBSR <- function(X, Y, clr.mat, nS, no.pr.val, weights.mat, prior.mat, cores) {
   Y <- t(scale(t(Y)))
   
   G <- nrow(Y)  # number of genes
+  genes <- rownames(Y)
   K <- nrow(X)  # max number of possible predictors (number of TFs)
+  tfs <- rownames(X)
   
-  pp <- matrix(FALSE, G, K, dimnames=list(rownames(Y), rownames(X)))  # predictors that will be used in the regression
+  weights.mat <- weights.mat[genes, tfs]
+  clr.mat <- clr.mat[genes, tfs]
+  prior.mat <- prior.mat[genes, tfs]
+  
+  pp <- matrix(FALSE, G, K, dimnames=list(genes, tfs))  # predictors that will be used in the regression
   
   # keep all predictors that we have priors for
   pp[(weights.mat != no.pr.val) & !is.na(clr.mat)] <- TRUE
@@ -24,30 +30,32 @@ BBSR <- function(X, Y, clr.mat, nS, no.pr.val, weights.mat, prior.mat, cores) {
     clr.order <- order(clr.mat[ind, ], decreasing=TRUE, na.last=NA)
     pp[ind, clr.order[1:min(K, nS, length(clr.order))]] <- TRUE
   }
-  diag(pp) <- FALSE
+  # remove self-interactions from list of potential interactions
+  preds <- intersect(genes, tfs)
+  diag(pp[preds, preds]) <- FALSE
   
   # NEW: remove predictors that are constant or essentially duplicates of others
-  const <- which(apply(is.na(X), 1, sum) > 0)
-  cat('The following predictors are constant and will not be used:\n')
-  print(const)
-  pp[, const] <- FALSE
-  exp.mat <- X
-  done <- FALSE
-  while (!done) {
-    cor.mat <- cor(t(exp.mat))
-    diag(cor.mat) <- 0
-    cor.mat[is.na(cor.mat)] <- 0
-    todo <- which(apply(cor.mat > 0.99, 1, sum) > 0)
-    if (length(todo) > 0) {
-      remove <- which(cor.mat[todo[1], ] > 0.99)[1]
-      cat('Removing predictor', rownames(exp.mat)[remove], 'because it has correlation > 0.99 with', rownames(exp.mat)[todo[1]], '\n')
-      pp[, rownames(exp.mat)[todo[1]]] <- pp[, rownames(exp.mat)[todo[1]]] | pp[, rownames(exp.mat)[remove]]
-      pp[, rownames(exp.mat)[remove]] <- FALSE
-      exp.mat <- exp.mat[-remove, ]
-    } else {
-      done <- TRUE
-    }
-  }
+  #const <- which(apply(is.na(X), 1, sum) > 0)
+  #cat('The following predictors are constant and will not be used:\n')
+  #print(const)
+  #pp[, const] <- FALSE
+  #exp.mat <- X
+  #done <- FALSE
+  #while (!done) {
+  #  cor.mat <- cor(t(exp.mat))
+  #  diag(cor.mat) <- 0
+  #  cor.mat[is.na(cor.mat)] <- 0
+  #  todo <- which(apply(cor.mat > 0.99, 1, sum) > 0)
+  #  if (length(todo) > 0) {
+  #    remove <- which(cor.mat[todo[1], ] > 0.99)[1]
+  #    cat('Removing predictor', rownames(exp.mat)[remove], 'because it has correlation > 0.99 with', rownames(exp.mat)[todo[1]], '\n')
+  #   pp[, rownames(exp.mat)[todo[1]]] <- pp[, rownames(exp.mat)[todo[1]]] | pp[, rownames(exp.mat)[remove]]
+  #    pp[, rownames(exp.mat)[remove]] <- FALSE
+  #    exp.mat <- exp.mat[-remove, ]
+  #  } else {
+  #    done <- TRUE
+  #  }
+  #}
   
   out.list <- mclapply(1:G, BBSRforOneGene, X, Y, pp, weights.mat, nS, mc.cores=cores)
   return(out.list)
