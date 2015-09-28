@@ -126,11 +126,11 @@ plot.TFs.and.targets <- function(net, prior, des.mat, res.mat, exp.mat, out.dir,
 
 get.net <- function(betas, betas.resc, th, method) {
   if (method == 'frequency') {
-    beta.sign <- as.matrix(betas[[1]] * 0)
+    beta.count <- as.matrix(betas[[1]] * 0)
     for (n in 1:length(betas)) {
-      beta.sign <- beta.sign + sign(betas[[n]])
+      beta.count <- beta.count + as.matrix(betas[[n]] != 0)
     }
-    net <- sign(beta.sign) * (abs(beta.sign) >= length(betas)*th)
+    net <- (beta.count > length(betas)*th) + 0
   }
   if (method == 'var.exp') {
     beta.non.zero <- as.matrix(betas.resc[[1]] * 0)
@@ -155,7 +155,8 @@ vis.tfs.and.targets <- function(ccfile, CORES=4) {
   load(gsub('combinedconf', 'betas', ccfile))
   load(paste(in.dir, 'params_and_input.RData', sep='/'))
   
-  net <- get.net(betas, betas.resc, 0.2, 'var.exp')
+  #net <- get.net(betas, betas.resc, 0.2, 'var.exp')
+  net <- get.net(betas, betas.resc, 0.5, 'frequency')
   
   # match the ccfile to the prior that was used
   p.ind <- which(sapply(names(IN$priors), function(n) grepl(n, ccfile)))
@@ -206,6 +207,8 @@ vis.tfs.and.targets <- function(ccfile, CORES=4) {
 
 #v23.small.pr <- '/home/ch1421/Projects/Rice/inferelator_output/150622_allmotifs_694bp_open_expr_adjpth001_incl_autoreg_merged005_filtered_32_47842_462_3364_462tfs_BBSR_1.1_20/combinedconf_frac_tp_100_perm_1--frac_fp_0_perm_1_1.1.RData'
 #v24.small.pr <- '/home/ch1421/Projects/Rice/inferelator_output/150622_allmotifs_694bp_open_expr_adjpth001_incl_autoreg_merged005_filtered_32_47842_462_3364__462tfs_sspr_BBSR_1.1_20/combinedconf_frac_tp_100_perm_1--frac_fp_0_perm_1_1.1.RData'
+#v2x.small.pr <- '/home/ch1421/Projects/Rice/inferelator_output/150622_allmotifs_694bp_open_expr_adjpth001_incl_autoreg_merged005_filtered_32_47842_462_3364_lesstfs_sspr_BBSR_1.1_41/combinedconf_frac_tp_100_perm_1--frac_fp_0_perm_1_1.1.RData'
+#v26.small.pr <- '/home/ch1421/Projects/Rice/inferelator_output/150622_allmotifs_694bp_open_expr_adjpth001_incl_autoreg_merged005_filtered_32_47842_462_3364_lesstfs_sspr_BBSR_1.1_101/combinedconf_frac_tp_100_perm_1--frac_fp_0_perm_1_1.1.RData'
 
-#vis.tfs.and.targets(v24.small.pr, CORES=4)
+#vis.tfs.and.targets(v26.small.pr, CORES=4)
 
