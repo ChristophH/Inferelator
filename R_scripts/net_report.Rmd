@@ -51,7 +51,7 @@ var.exp <- as.matrix(betas.resc[[1]] * 0)
 var.exp[net.df$vec.ind] <- net.df$var.exp.median
                      
 VAR.EXP.TH <- 0.2
-BETA.SIGN.TH <- 0.75 * PARS$num.boots
+BETA.SIGN.TH <- 0.5 * PARS$num.boots
 
 
 net.stats <- function(prior.mat) {
