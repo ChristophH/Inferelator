@@ -10,17 +10,32 @@ library('Matrix')
 rm(list=ls())
 gc()
 
-source('R_scripts/utils.R')
-source('R_scripts/design_and_response.R')
-source('R_scripts/priors.R')
-source('R_scripts/mi_and_clr.R')
-source('R_scripts/bayesianRegression.R')
-source('R_scripts/men.R')
-source('R_scripts/evaluate.R')
-source('R_scripts/tfa.R')
-source('R_scripts/group_predictors.R')
-source('R_scripts/summarize_results.R')
-source('R_scripts/vis_tfs_and_targets.R')
+# Get the directory in which inferelator.R sits
+thisFile <- function() {
+        cmdArgs <- commandArgs(trailingOnly = FALSE)
+        needle <- "--file="
+        match <- grep(needle, cmdArgs)
+        if (length(match) > 0) {
+                # Rscript
+                return(normalizePath(sub(needle, "", cmdArgs[match])))
+        } else {
+                # 'source'd via R console
+                return(normalizePath(sys.frames()[[1]]$ofile))
+        }
+}
+baseDirectory <- dirname(thisFile())
+
+source(paste(sep="/", baseDirectory, 'R_scripts/utils.R'))
+source(paste(sep="/", baseDirectory, 'R_scripts/design_and_response.R'))
+source(paste(sep="/", baseDirectory, 'R_scripts/priors.R'))
+source(paste(sep="/", baseDirectory, 'R_scripts/mi_and_clr.R'))
+source(paste(sep="/", baseDirectory, 'R_scripts/bayesianRegression.R'))
+source(paste(sep="/", baseDirectory, 'R_scripts/men.R'))
+source(paste(sep="/", baseDirectory, 'R_scripts/evaluate.R'))
+source(paste(sep="/", baseDirectory, 'R_scripts/tfa.R'))
+source(paste(sep="/", baseDirectory, 'R_scripts/group_predictors.R'))
+source(paste(sep="/", baseDirectory, 'R_scripts/summarize_results.R'))
+source(paste(sep="/", baseDirectory, 'R_scripts/vis_tfs_and_targets.R'))
 
 
 date.time.str <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
@@ -429,7 +444,7 @@ PROCTIME <- proc.time() - start.proc.time
 save(PARS, IN, SEED, PROCTIME, file = paste(PARS$save.to.dir, "/params_and_input.RData", sep=""))
 
 # generate network report and visualize TFs and targets
-source('R_scripts/net_report_new.R')
+source(paste(sep="/", baseDirectory, 'R_scripts/net_report_new.R'))
 Sys.sleep(2)
 for (ccf in list.files(PARS$save.to.dir, pattern='combinedconf_*', full.names=TRUE)) {
   if (PARS$output.report) {

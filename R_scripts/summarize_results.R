@@ -1,5 +1,20 @@
 library('Matrix')
-source('R_scripts/evaluate.R')
+
+thisFile <- function() {
+        cmdArgs <- commandArgs(trailingOnly = FALSE)
+        needle <- "--file="
+        match <- grep(needle, cmdArgs)
+        if (length(match) > 0) {
+                # Rscript
+                return(normalizePath(sub(needle, "", cmdArgs[match])))
+        } else {
+                # 'source'd via R console
+                return(normalizePath(sys.frames()[[1]]$ofile))
+        }
+}
+baseDirectory <- dirname(thisFile())
+
+source(paste(sep="/",baseDirectory,'R_scripts/evaluate.R'))
 
 get.mean.and.lh <- function(mat) {
   ret <- list()
@@ -62,7 +77,7 @@ sum.net <- function(betas, betas.resc, comb.confs, IN, cc.file, th=0.5) {
   cat('A total of', length(gp$pred.has.na), 'predictors contained NA and were removed.\n')
   cat('A total of', length(gp$pred.is.const), 'predictors were constant and were removed.\n')
   cat('A total of', length(unique(unlist(gp$pred.groups))), 'predictors formed', length(gp$pred.groups), 'groups.\n')
-  source('R_scripts/evaluate.R')
+  source(paste(sep="/",baseDirectory,'R_scripts/evaluate.R'))
   cc.aupr <- aupr(comb.confs, p.mat, eval.on.subset=TRUE)
   cat('AUPR is', cc.aupr, '\n')
 
