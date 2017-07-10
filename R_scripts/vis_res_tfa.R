@@ -1,5 +1,21 @@
 library('Matrix')
-source('R_scripts/priors.R')
+
+# Get the directory in which inferelator.R sits
+thisFile <- function() {
+        cmdArgs <- commandArgs(trailingOnly = FALSE)
+        needle <- "--file="
+        match <- grep(needle, cmdArgs)
+        if (length(match) > 0) {
+                # Rscript
+                return(normalizePath(sub(needle, "", cmdArgs[match])))
+        } else {
+                # 'source'd via R console
+                return(normalizePath(sys.frames()[[1]]$ofile))
+        }
+}
+baseDirectory <- dirname(thisFile())
+
+source(paste(sep="/",baseDirectory,'R_scripts/priors.R'))
 
 ChristophsPR <- function(ord.idx, gs) {
   prec <- cumsum(gs[ord.idx]) / cumsum(rep(1, length(ord.idx)))
